@@ -1,3 +1,4 @@
+from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 from .models import User
@@ -33,5 +34,20 @@ class PermissionTest(APITestCase):
         response = self.client.get("/api/auth/teacher-test/")
 
         self.assertEqual(response.status_code, 403)
+class CreateUserCommandTest(APITestCase):
+
+    def test_create_user_command(self):
+        call_command(
+            "create_user",
+            username="command_teacher",
+            password="12345678",
+            phone="09333333333",
+            role="teacher",
+        )
+
+        user = User.objects.get(username="command_teacher")
+
+        self.assertEqual(user.role, "teacher")
+        self.assertEqual(user.phone, "09333333333")        
 
    
