@@ -82,6 +82,13 @@ class PermissionTest(APITestCase):
         response = self.client.get("/api/auth/teacher-test/")
 
         self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_user_cannot_access_teacher_api(self):
+        response = self.client.get(
+            "/api/auth/teacher-test/"
+        )
+
+        self.assertEqual(response.status_code, 401)    
 class CreateUserCommandTest(APITestCase):
 
     def test_create_user_command(self):
