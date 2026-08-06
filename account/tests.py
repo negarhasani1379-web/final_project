@@ -1,4 +1,5 @@
 from django.core.management import call_command
+from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from .models import User
@@ -48,6 +49,16 @@ class CreateUserCommandTest(APITestCase):
         user = User.objects.get(username="command_teacher")
 
         self.assertEqual(user.role, "teacher")
-        self.assertEqual(user.phone, "09333333333")        
+        self.assertEqual(user.phone, "09333333333")  
 
-   
+class JWTLoginTest(APITestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="jwt_teacher",
+            password="12345678",
+            role="teacher",
+            phone="09333333335",
+        )
+
+    
