@@ -33,3 +33,5 @@ class PermissionTest(APITestCase):
         response = self.client.get("/api/auth/teacher-test/")
 
         self.assertEqual(response.status_code, 403)
+
+   
