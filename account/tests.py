@@ -61,4 +61,16 @@ class JWTLoginTest(APITestCase):
             phone="09333333335",
         )
 
-    
+    def test_login_success(self):
+        response = self.client.post(
+            "/api/auth/login/",
+            {
+                "username": "jwt_teacher",
+                "password": "12345678",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
