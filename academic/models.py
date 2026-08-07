@@ -1,5 +1,6 @@
 from django.db import models
 
+from account.models import User, UserRole
 from core.models import BaseModel
 from school.models import School
 
@@ -37,4 +38,25 @@ class Class(BaseModel):
         related_name="classes",
     )
 
-    session_duration = models.PositiveIntegerField()    
+    session_duration = models.PositiveIntegerField()
+
+class TeacherAssignment(BaseModel):
+    teacher = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+        limit_choices_to={"role": UserRole.TEACHER},
+    )
+
+    classroom = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name="teacher_assignments",
+    )
+
+    start_date = models.DateField()
+
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+    )
