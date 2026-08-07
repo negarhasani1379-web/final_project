@@ -1,6 +1,7 @@
 from django.db import models
 
 from core.models import BaseModel
+from school.models import School
 
 
 class TermType(models.TextChoices):
@@ -19,3 +20,21 @@ class Term(BaseModel):
     
     def __str__(self):
         return self.title
+    
+
+class Class(BaseModel):
+    title = models.CharField(max_length=100)
+
+    school = models.ForeignKey(
+        School,
+        on_delete=models.CASCADE,
+        related_name="classes",
+    )
+
+    term = models.ForeignKey(
+        Term,
+        on_delete=models.CASCADE,
+        related_name="classes",
+    )
+
+    session_duration = models.PositiveIntegerField()    
