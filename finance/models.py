@@ -60,3 +60,32 @@ class SessionReport(BaseModel):
 
 
 
+class Salary(BaseModel):
+    teacher = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="salaries",
+        limit_choices_to={"role": UserRole.TEACHER},
+    )
+
+    term = models.ForeignKey(
+        Term,
+        on_delete=models.CASCADE,
+        related_name="salaries",
+    )
+
+    month = models.PositiveSmallIntegerField()
+
+    calculated_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    final_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    adjustment_reason = models.TextField(
+        blank=True,
+    )
