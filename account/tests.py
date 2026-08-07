@@ -1,3 +1,5 @@
+import jwt
+from django.conf import settings
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
@@ -50,7 +52,29 @@ class JWTLoginTest(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 401)    
+        self.assertEqual(response.status_code, 401)
+
+    def test_login_contains_role_in_token(self):
+        response = self.client.post(
+            "/api/auth/login/",
+            {
+                "username": "jwt_teacher",
+                "password": "12345678",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        access_token = response.data["access"]
+
+        decoded_token = jwt.decode(
+            access_token,
+            settings.SECRET_KEY,
+            algorithms=["HS256"],
+        )
+
+        self.assertEqual(decoded_token["role"], "teacher")    
 
 class PermissionTest(APITestCase):
 
