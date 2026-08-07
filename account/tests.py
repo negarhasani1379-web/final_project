@@ -139,3 +139,20 @@ class CreateUserCommandTest(APITestCase):
                 phone="09333333336",
                 role="student",
             )
+
+    def test_create_user_with_duplicate_username(self):
+        User.objects.create_user(
+            username="duplicate_user",
+            password="12345678",
+            phone="09333333337",
+            role="teacher",
+        )
+
+        with self.assertRaises(Exception):
+            call_command(
+                "create_user",
+                username="duplicate_user",
+                password="12345678",
+                phone="09333333338",
+                role="teacher",
+            )
