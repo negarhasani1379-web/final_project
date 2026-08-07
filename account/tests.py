@@ -2,6 +2,7 @@ import jwt
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import IntegrityError
 from rest_framework.test import APITestCase
 
 from .models import User
@@ -155,4 +156,22 @@ class CreateUserCommandTest(APITestCase):
                 password="12345678",
                 phone="09333333338",
                 role="teacher",
+            )
+
+class UserModelTest(APITestCase):
+
+    def test_user_phone_must_be_unique(self):
+        User.objects.create_user(
+            username="user_one",
+            password="12345678",
+            phone="09111111111",
+            role="teacher",
+        )
+
+        with self.assertRaises(IntegrityError):
+            User.objects.create_user(
+                username="user_two",
+                password="12345678",
+                phone="09111111111",
+                role="finance",
             )
