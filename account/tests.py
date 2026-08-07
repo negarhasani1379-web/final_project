@@ -1,6 +1,7 @@
 import jwt
 from django.conf import settings
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from rest_framework.test import APITestCase
 
 from .models import User
@@ -127,5 +128,31 @@ class CreateUserCommandTest(APITestCase):
         user = User.objects.get(username="command_teacher")
 
         self.assertEqual(user.role, "teacher")
-        self.assertEqual(user.phone, "09333333333")  
+        self.assertEqual(user.phone, "09333333333") 
 
+    def test_create_user_with_invalid_role(self):
+        with self.assertRaises(CommandError):
+            call_command(
+                "create_user",
+                username="invalid_role_user",
+                password="12345678",
+                phone="09333333336",
+                role="student",
+            )
+
+    def test_create_user_with_duplicate_username(self):
+        User.objects.create_user(
+            username="duplicate_user",
+            password="12345678",
+            phone="09333333337",
+            role="teacher",
+        )
+
+        with self.assertRaises(Exception):
+            call_command(
+                "create_user",
+                username="duplicate_user",
+                password="12345678",
+                phone="09333333338",
+                role="teacher",
+            )
