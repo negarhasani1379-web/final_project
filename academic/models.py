@@ -16,7 +16,6 @@ class Term(BaseModel):
         max_length=10,
         choices=TermType.choices,
     )
-    base_rate = models.PositiveIntegerField()
-
+    
     def __str__(self):
         return self.title
