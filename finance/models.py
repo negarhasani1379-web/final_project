@@ -1,6 +1,6 @@
 from django.db import models
 
-from academic.models import Term
+from academic.models import TeacherAssignment, Term
 from account.models import User, UserRole
 from core.models import BaseModel
 
@@ -31,6 +31,32 @@ class TeacherTermRate(BaseModel):
                 name="unique_teacher_term_rate",
             )
         ]
+
+
+class SessionReport(BaseModel):
+    teacher_assignment = models.ForeignKey(
+        TeacherAssignment,
+        on_delete=models.CASCADE,
+        related_name="session_reports",
+    )
+
+    session_date = models.DateField()
+
+    session_number = models.PositiveIntegerField()
+
+    lesson_summary = models.TextField()
+
+    present_count = models.PositiveIntegerField()
+
+    absent_count = models.PositiveIntegerField()
+
+    status = models.CharField(max_length=30)
+
+    review_comment = models.TextField(
+        blank=True,
+    )
+
+    is_late = models.BooleanField(default=False)        
 
 
 
