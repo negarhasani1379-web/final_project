@@ -15,10 +15,13 @@ class User(AbstractUser, BaseModel):
         max_length=10,
         choices=UserRole.choices,
     )
+
     phone = models.CharField(
-        max_length=11,
-        unique=True,
+        max_length=20,
+        null=True,
+        blank=True,
     )
+
     emergency_phone = models.CharField(
         max_length=11,
         blank=True,
