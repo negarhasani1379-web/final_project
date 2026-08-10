@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from account.models import User, UserRole
 
@@ -23,6 +23,7 @@ class Command(BaseCommand):
         parser.add_argument("--phone", type=str)
         parser.add_argument("--emergency-phone", type=str)
 
+    
     def handle(self, *args, **options):
         role = options["role"]
 
@@ -31,20 +32,14 @@ class Command(BaseCommand):
 
         if role == UserRole.TEACHER:
             if not phone:
-                self.stdout.write(
-                    self.style.ERROR(
-                        "Phone is required for teachers."
-                    )
+                raise CommandError(
+                    "Phone is required for teachers."
                 )
-                return
 
             if not emergency_phone:
-                self.stdout.write(
-                    self.style.ERROR(
-                        "Emergency phone is required for teachers."
-                    )
+                raise CommandError(
+                    "Emergency phone is required for teachers."
                 )
-                return
 
         user = User.objects.create_user(
             username=options["username"],

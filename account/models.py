@@ -20,6 +20,7 @@ class User(AbstractUser, BaseModel):
         max_length=20,
         null=True,
         blank=True,
+        unique=True,
     )
 
     emergency_phone = models.CharField(

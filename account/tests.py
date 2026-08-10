@@ -116,20 +116,24 @@ class PermissionTest(APITestCase):
 
         self.assertEqual(response.status_code, 401)    
 class CreateUserCommandTest(APITestCase):
-
     def test_create_user_command(self):
         call_command(
             "create_user",
             username="command_teacher",
             password="12345678",
             phone="09333333333",
+            emergency_phone="09444444444",
             role="teacher",
         )
 
         user = User.objects.get(username="command_teacher")
 
         self.assertEqual(user.role, "teacher")
-        self.assertEqual(user.phone, "09333333333") 
+        self.assertEqual(user.phone, "09333333333")
+        self.assertEqual(
+            user.emergency_phone,
+            "09444444444",
+        )
 
     def test_create_user_with_invalid_role(self):
         with self.assertRaises(CommandError):
@@ -146,6 +150,7 @@ class CreateUserCommandTest(APITestCase):
             username="duplicate_user",
             password="12345678",
             phone="09333333337",
+            emergency_phone="09444444444",
             role="teacher",
         )
 
@@ -155,8 +160,54 @@ class CreateUserCommandTest(APITestCase):
                 username="duplicate_user",
                 password="12345678",
                 phone="09333333338",
+                emergency_phone="09444444445",
                 role="teacher",
             )
+
+    def test_teacher_requires_phone(self):
+        with self.assertRaises(CommandError):
+            call_command(
+                "create_user",
+                username="teacher_no_phone",
+                password="12345678",
+                role="teacher",
+            )
+
+    def test_teacher_requires_emergency_phone(self):
+        with self.assertRaises(CommandError):
+            call_command(
+                "create_user",
+                username="teacher_no_emergency",
+                password="12345678",
+                phone="09111111111",
+                role="teacher",
+            )
+
+    def test_education_without_phone(self):
+        call_command(
+            "create_user",
+            username="education_test",
+            password="12345678",
+            role="education",
+        )
+
+        user = User.objects.get(username="education_test")
+
+        self.assertEqual(user.role, "education")
+        self.assertIsNone(user.phone)
+
+    def test_finance_without_phone(self):
+        call_command(
+            "create_user",
+            username="finance_test",
+            password="12345678",
+            role="finance",
+        )
+
+        user = User.objects.get(username="finance_test")
+
+        self.assertEqual(user.role, "finance")
+        self.assertIsNone(user.phone)
 
 class UserModelTest(APITestCase):
 
