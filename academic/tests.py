@@ -252,3 +252,41 @@ class TermAPITest(APITestCase):
         )
         term.refresh_from_db()
         self.assertEqual(term.end_date.isoformat(), "2027-01-20")
+
+
+    def test_education_can_soft_delete_term(self):
+        self.client.force_authenticate(user=self.education)
+
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        response = self.client.delete(
+            f"{self.url}{term.id}/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        term.refresh_from_db()
+
+        self.assertTrue(term.is_deleted)
+
+    def test_deleted_term_is_not_in_term_list(self):
+        self.client.force_authenticate(user=self.education)
+
+        term = Term.objects.create(
+            title="Deleted Term",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        term.delete()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)       
