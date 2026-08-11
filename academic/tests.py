@@ -52,4 +52,15 @@ class TermTest(TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            term.full_clean()              
+            term.full_clean() 
+
+    def test_term_title_is_required(self):
+        term = Term(
+            title="",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean()                     
