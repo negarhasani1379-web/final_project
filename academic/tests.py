@@ -160,4 +160,54 @@ class TermAPITest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], term.id)
-        self.assertEqual(response.data["title"], "Fall 2026")                                                  
+        self.assertEqual(response.data["title"], "Fall 2026") 
+
+    def test_create_term_with_invalid_dates(self):
+        self.client.force_authenticate(user=self.education)
+
+        data = {
+            "title": "Invalid Term",
+            "start_date": "2026-09-01",
+            "end_date": "2026-08-01",
+            "term_type": "normal",
+        }
+
+        response = self.client.post(
+            self.url,
+            data,
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(Term.objects.count(), 0) 
+
+    def test_create_term_with_invalid_term_type(self):
+        self.client.force_authenticate(user=self.education)
+
+        data = {
+            "title": "Invalid Type Term",
+            "start_date": "2026-09-01",
+            "end_date": "2027-01-20",
+            "term_type": "winter",
+        }
+
+        response = self.client.post(
+            self.url,
+            data,
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(Term.objects.count(), 0) 
+
+
+          
+
