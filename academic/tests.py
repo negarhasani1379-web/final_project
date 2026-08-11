@@ -209,5 +209,46 @@ class TermAPITest(APITestCase):
         self.assertEqual(Term.objects.count(), 0) 
 
 
-          
+    def test_education_can_update_term(self):
+        self.client.force_authenticate(user=self.education)
 
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+        response = self.client.patch(
+            f"{self.url}{term.id}/",
+            {
+                "title": "Fall 2026 Updated",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        term.refresh_from_db()
+        self.assertEqual(term.title, "Fall 2026 Updated")      
+
+    
+    def test_update_term_with_invalid_dates(self):
+        self.client.force_authenticate(user=self.education)
+
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+        response = self.client.patch(
+            f"{self.url}{term.id}/",
+            {
+                "end_date": "2026-08-01",
+            },
+            format="json",
+        )
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        term.refresh_from_db()
+        self.assertEqual(term.end_date.isoformat(), "2027-01-20")
