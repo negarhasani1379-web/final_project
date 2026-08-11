@@ -7,7 +7,7 @@ from .serializers import SchoolSerializer
 
 
 class SchoolViewSet(ModelViewSet):
-    queryset = School.objects.all()
+    queryset = School.objects.filter(is_deleted=False)
     serializer_class = SchoolSerializer
     permission_classes = [IsEducation]
 
