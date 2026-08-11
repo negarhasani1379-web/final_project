@@ -41,4 +41,15 @@ class TermTest(TestCase):
         term.full_clean()
         term.save()
 
-        self.assertEqual(term.term_type, "summer")           
+        self.assertEqual(term.term_type, "summer") 
+
+    def test_term_type_must_be_valid(self):
+        term = Term(
+            title="Invalid Type Term",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="winter",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean()              
