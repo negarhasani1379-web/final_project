@@ -128,4 +128,36 @@ class TermAPITest(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(Term.objects.count(), 0)                                           
+        self.assertEqual(Term.objects.count(), 0) 
+
+    def test_education_can_list_terms(self):
+        self.client.force_authenticate(user=self.education)
+
+        Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["title"], "Fall 2026")
+
+    def test_education_can_retrieve_term(self):
+        self.client.force_authenticate(user=self.education)
+
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        response = self.client.get(f"{self.url}{term.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], term.id)
+        self.assertEqual(response.data["title"], "Fall 2026")                                                  
