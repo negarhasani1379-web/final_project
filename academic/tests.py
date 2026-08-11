@@ -18,3 +18,14 @@ class TermTest(TestCase):
 
         self.assertEqual(term.title, "Fall 2026")
         self.assertEqual(term.term_type, "normal")
+
+    def test_term_end_date_cannot_be_before_start_date(self):
+        term = Term(
+            title="Invalid Term",
+            start_date="2026-09-01",
+            end_date="2026-08-01",
+            term_type="normal",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean()    
