@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from account.models import User, UserRole
@@ -18,6 +19,12 @@ class Term(BaseModel):
         max_length=10,
         choices=TermType.choices,
     )
+    
+    def clean(self):
+        if self.end_date < self.start_date:
+            raise ValidationError(
+                "End date cannot be before start date."
+            )
     
     def __str__(self):
         return self.title
