@@ -28,4 +28,17 @@ class TermTest(TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            term.full_clean()    
+            term.full_clean() 
+
+    def test_create_summer_term(self):
+        term = Term(
+            title="Summer 2026",
+            start_date="2026-06-01",
+            end_date="2026-08-31",
+            term_type="summer",
+        )
+
+        term.full_clean()
+        term.save()
+
+        self.assertEqual(term.term_type, "summer")           
