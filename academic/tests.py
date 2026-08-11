@@ -1,5 +1,10 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from account.models import User
 
 from .models import Term
 
@@ -63,4 +68,64 @@ class TermTest(TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            term.full_clean()                     
+            term.full_clean() 
+
+class TermAPITest(APITestCase):
+
+    def setUp(self):
+        self.education = User.objects.create_user(
+            username="education_test",
+            password="Test12345",
+            role="education",
+        )
+
+        self.teacher = User.objects.create_user(
+            username="teacher_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        self.term_data = {
+            "title": "Fall 2026",
+            "start_date": "2026-09-01",
+            "end_date": "2027-01-20",
+            "term_type": "normal",
+        }
+
+        self.url = "/api/terms/"
+
+
+    def test_education_can_create_term(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.post(
+            self.url,
+            self.term_data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Term.objects.count(), 1)
+        self.assertEqual(response.data["title"], "Fall 2026")
+
+    def test_teacher_cannot_create_term(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.post(
+            self.url,
+            self.term_data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Term.objects.count(), 0) 
+
+    def test_unauthenticated_user_cannot_create_term(self):
+        response = self.client.post(
+            self.url,
+            self.term_data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(Term.objects.count(), 0)                                           
