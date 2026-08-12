@@ -987,5 +987,165 @@ class TeacherAssignmentTest(APITestCase):
 
         assignment.refresh_from_db()
 
-        self.assertTrue(assignment.is_deleted)                                         
+        self.assertTrue(assignment.is_deleted)
+
+############Teacher_Classes############
+    def test_teacher_can_list_own_classes(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            "/api/teacher-classes/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )
+
+    def test_teacher_cannot_see_other_teacher_classes(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        other_teacher = User.objects.create_user(
+            username="other_teacher_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            "/api/teacher-classes/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            0,
+        )
+
+    def test_teacher_can_see_past_classes(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-01-01",
+            end_date="2026-02-01",
+        )
+
+        response = self.client.get(
+            "/api/teacher-classes/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )
+
+    def test_education_cannot_list_teacher_classes(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            "/api/teacher-classes/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_multiple_teachers_can_have_same_class_at_different_times(self):
+        other_teacher = User.objects.create_user(
+            username="other_teacher_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-09-30",
+        )
+
+        TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=self.classroom,
+            start_date="2026-10-01",
+            end_date="2026-11-01",
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.get("/api/teacher-classes/")
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )
+
+        self.client.force_authenticate(user=other_teacher)
+
+        response = self.client.get("/api/teacher-classes/")
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )                                                            
                                     
