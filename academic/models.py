@@ -45,7 +45,14 @@ class Class(BaseModel):
         related_name="classes",
     )
 
-    session_duration = models.PositiveIntegerField()
+    
+    session_duration = models.PositiveIntegerField(
+        choices=[
+            (60, "60 minutes"),
+            (90, "90 minutes"),
+            (120, "120 minutes"),
+        ]
+    )
 
 class TeacherAssignment(BaseModel):
     teacher = models.ForeignKey(
