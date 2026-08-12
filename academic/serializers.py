@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Class, Term
+from .models import Class, TeacherAssignment, Term
 
 
 class TermSerializer(serializers.ModelSerializer):
@@ -43,3 +43,28 @@ class ClassSerializer(serializers.ModelSerializer):
             "term",
             "session_duration",
         )
+
+class TeacherAssignmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TeacherAssignment
+        fields = (
+            "id",
+            "teacher",
+            "classroom",
+            "start_date",
+            "end_date",
+        )
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+
+        if end_date is not None and start_date is not None:
+            if end_date < start_date:
+                raise serializers.ValidationError(
+                    {
+                        "end_date": "End date cannot be before start date."
+                    }
+                )
+
+        return attrs        

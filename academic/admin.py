@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Class, Term
+from .models import Class, TeacherAssignment, Term
 
 
 @admin.register(Term)
@@ -32,3 +32,22 @@ class ClassAdmin(admin.ModelAdmin):
     search_fields = (
         "title",
     )
+
+@admin.register(TeacherAssignment)
+class TeacherAssignmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "teacher",
+        "classroom",
+        "start_date",
+        "end_date",
+    )
+
+    list_filter = (
+        "start_date",
+        "end_date",
+    )
+
+    search_fields = (
+        "teacher__username",
+        "classroom__title",
+    )    
