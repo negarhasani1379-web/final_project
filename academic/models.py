@@ -74,3 +74,14 @@ class TeacherAssignment(BaseModel):
         null=True,
         blank=True,
     )
+    def clean(self):
+        super().clean()
+
+        if (
+            self.start_date
+            and self.end_date
+            and self.end_date < self.start_date
+        ):
+            raise ValidationError(
+                "End date cannot be before start date."
+            )
