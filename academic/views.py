@@ -17,7 +17,7 @@ class ClassViewSet(ModelViewSet):
     permission_classes = [IsEducation]
 
 class TeacherAssignmentViewSet(ModelViewSet):
-    queryset = TeacherAssignment.objects.all()
+    queryset = TeacherAssignment.objects.filter(is_deleted=False)
     serializer_class = TeacherAssignmentSerializer
     permission_classes = [IsEducation]    
 
