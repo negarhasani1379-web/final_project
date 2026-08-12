@@ -866,5 +866,126 @@ class TeacherAssignmentTest(APITestCase):
                 classroom=self.classroom
             ).count(),
             2,
-        )                        
-                        
+        ) 
+
+
+    def test_education_can_list_teacher_assignments(self):
+        self.client.force_authenticate(user=self.education)
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            "/api/teacher-assignments/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(len(response.data), 1) 
+
+    def test_education_can_retrieve_teacher_assignment(self):
+        self.client.force_authenticate(user=self.education)
+
+        assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            f"/api/teacher-assignments/{assignment.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(
+            response.data["id"],
+            assignment.id,
+        ) 
+
+    def test_education_can_update_teacher_assignment(self):
+        self.client.force_authenticate(user=self.education)
+
+        assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.patch(
+            f"/api/teacher-assignments/{assignment.id}/",
+            {
+                "end_date": "2026-10-15",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        assignment.refresh_from_db()
+
+        self.assertEqual(
+            str(assignment.end_date),
+            "2026-10-15",
+        )
+
+    def test_update_teacher_assignment_with_invalid_dates(self):
+        self.client.force_authenticate(user=self.education)
+
+        assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.patch(
+            f"/api/teacher-assignments/{assignment.id}/",
+            {
+                "start_date": "2026-11-01",
+                "end_date": "2026-10-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_education_can_delete_teacher_assignment(self):
+        self.client.force_authenticate(user=self.education)
+
+        assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.delete(
+            f"/api/teacher-assignments/{assignment.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        assignment.refresh_from_db()
+
+        self.assertTrue(assignment.is_deleted)                                         
+                                    
