@@ -637,9 +637,15 @@ class ClassAPITest(APITestCase):
 
 
 ##########TeacherAssignment########## 
-class TeacherAssignmentTest(TestCase):
+class TeacherAssignmentTest(APITestCase):
 
     def setUp(self):
+        self.education = User.objects.create_user(
+            username="education_assignment_test",
+            password="Test12345",
+            role="education",
+        )
+
         self.teacher = User.objects.create_user(
             username="teacher_assignment_test",
             password="Test12345",
@@ -763,5 +769,102 @@ class TeacherAssignmentTest(TestCase):
             "start_date": "2026-09-01",
         })
 
-        self.assertTrue(serializer.is_valid(), serializer.errors)         
-                    
+        self.assertTrue(serializer.is_valid(), serializer.errors) 
+
+
+    def test_education_can_create_teacher_assignment(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.post(
+            "/api/teacher-assignments/",
+            {
+                "teacher": self.teacher.id,
+                "classroom": self.classroom.id,
+                "start_date": "2026-09-01",
+                "end_date": "2026-10-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_teacher_cannot_create_teacher_assignment(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.post(
+            "/api/teacher-assignments/",
+            {
+                "teacher": self.teacher.id,
+                "classroom": self.classroom.id,
+                "start_date": "2026-09-01",
+                "end_date": "2026-10-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_assignment_with_invalid_dates(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.post(
+            "/api/teacher-assignments/",
+            {
+                "teacher": self.teacher.id,
+                "classroom": self.classroom.id,
+                "start_date": "2026-10-01",
+                "end_date": "2026-09-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_class_can_have_multiple_teacher_assignments_api(self):
+        self.client.force_authenticate(user=self.education)
+
+        teacher_2 = User.objects.create_user(
+            username="teacher_assignment_test_2",
+            password="Test12345",
+            role="teacher",
+        )
+
+        response_1 = self.client.post(
+            "/api/teacher-assignments/",
+            {
+                "teacher": self.teacher.id,
+                "classroom": self.classroom.id,
+                "start_date": "2026-09-01",
+                "end_date": "2026-10-01",
+            },
+            format="json",
+        )
+
+        response_2 = self.client.post(
+            "/api/teacher-assignments/",
+            {
+                "teacher": teacher_2.id,
+                "classroom": self.classroom.id,
+                "start_date": "2026-10-02",
+                "end_date": "2026-11-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response_1.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        self.assertEqual(
+            response_2.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        self.assertEqual(
+            TeacherAssignment.objects.filter(
+                classroom=self.classroom
+            ).count(),
+            2,
+        )                        
+                        
