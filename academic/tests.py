@@ -7,6 +7,7 @@ from account.models import User
 from school.models import School
 
 from .models import Class, TeacherAssignment, Term
+from .serializers import TeacherAssignmentSerializer
 
 
 ########## TERM #########
@@ -724,5 +725,43 @@ class TeacherAssignmentTest(TestCase):
         self.assertEqual(
             self.classroom.teacher_assignments.count(),
             2,
-        )      
+        ) 
+
+    def test_serializer_accepts_valid_assignment(self):
+        serializer = TeacherAssignmentSerializer(data={
+            "teacher": self.teacher.id,
+            "classroom": self.classroom.id,
+            "start_date": "2026-09-01",
+            "end_date": "2026-10-01",
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+
+    def test_serializer_rejects_invalid_date_range(self):
+        serializer = TeacherAssignmentSerializer(
+            data={
+                "teacher": self.teacher.id,
+                "classroom": self.classroom.id,
+                "start_date": "2026-10-01",
+                "end_date": "2026-09-01",
+            }
+        )
+
+        self.assertFalse(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        self.assertIn("end_date", serializer.errors)
+
+
+    def test_serializer_accepts_missing_end_date(self):
+        serializer = TeacherAssignmentSerializer(data={
+            "teacher": self.teacher.id,
+            "classroom": self.classroom.id,
+            "start_date": "2026-09-01",
+        })
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)         
                     
