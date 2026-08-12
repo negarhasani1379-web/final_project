@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Term
+from .models import Class, Term
 
 
 class TermSerializer(serializers.ModelSerializer):
@@ -31,3 +31,15 @@ class TermSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+class ClassSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Class
+        fields = (
+            "id",
+            "title",
+            "school",
+            "term",
+            "session_duration",
+        )
