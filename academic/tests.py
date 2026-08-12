@@ -1,14 +1,14 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from account.models import User
+from school.models import School
 
-from .models import Term
+from .models import Class, Term
 
-
+########## TERM #########
 class TermTest(TestCase):
     def test_create_term_with_valid_dates(self):
         term = Term(
@@ -289,4 +289,98 @@ class TermAPITest(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)       
+        self.assertEqual(len(response.data), 0) 
+
+
+
+########## CLASS ######### 
+
+class ClassTest(TestCase):
+    def test_create_class_with_valid_session_duration(self):
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        school = School.objects.create(
+            name="Test School",
+        )
+
+        classroom = Class(
+            title="English Literature",
+            school=school,
+            term=term,
+            session_duration=90,
+        )
+
+        classroom.full_clean()
+        classroom.save()
+
+        self.assertEqual(classroom.title, "English Literature")
+        self.assertEqual(classroom.session_duration, 90)
+
+    def test_class_accepts_60_minutes(self):
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        school = School.objects.create(
+            name="Test School",
+        )
+
+        classroom = Class(
+            title="English",
+            school=school,
+            term=term,
+            session_duration=60,
+        )
+
+        classroom.full_clean()
+
+    def test_class_accepts_120_minutes(self):
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        school = School.objects.create(
+            name="Test School",
+        )
+
+        classroom = Class(
+            title="English",
+            school=school,
+            term=term,
+            session_duration=120,
+        )
+
+        classroom.full_clean()
+
+    def test_class_rejects_invalid_session_duration(self):
+        term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        school = School.objects.create(
+            name="Test School",
+        )
+
+        classroom = Class(
+            title="English",
+            school=school,
+            term=term,
+            session_duration=75,
+        )
+
+        with self.assertRaises(ValidationError):
+            classroom.full_clean()            
