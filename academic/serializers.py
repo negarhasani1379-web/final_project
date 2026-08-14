@@ -1,3 +1,6 @@
+from datetime import date
+
+from django.db.models import Q
 from rest_framework import serializers
 
 from .models import Class, TeacherAssignment, Term
@@ -58,13 +61,34 @@ class TeacherAssignmentSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         start_date = attrs.get("start_date")
         end_date = attrs.get("end_date")
+        classroom = attrs.get("classroom")
 
+    
         if end_date is not None and start_date is not None:
             if end_date < start_date:
                 raise serializers.ValidationError(
                     {
                         "end_date": "End date cannot be before start date."
                     }
+            )
+
+   
+        if classroom and start_date:
+            overlapping = TeacherAssignment.objects.filter(
+                classroom=classroom,
+                start_date__lte=end_date or date.max,
+            ).filter(
+                Q(end_date__isnull=True) | Q(end_date__gte=start_date)
+            )
+
+            if self.instance:
+                overlapping = overlapping.exclude(
+                    pk=self.instance.pk
                 )
 
-        return attrs        
+            if overlapping.exists():
+                raise serializers.ValidationError(
+                    "This classroom already has a teacher assigned during this period."
+                )
+
+        return attrs       
