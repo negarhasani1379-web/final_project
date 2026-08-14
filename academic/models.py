@@ -28,10 +28,19 @@ class Term(BaseModel):
             raise ValidationError(
                 "End date cannot be before start date."
             )
-    
-    def __str__(self):
-        return self.title
-    
+
+        overlapping = Term.objects.filter(
+            start_date__lte=self.end_date,
+            end_date__gte=self.start_date,
+        )
+
+        if self.pk:
+            overlapping = overlapping.exclude(pk=self.pk)
+
+        if overlapping.exists():
+            raise ValidationError(
+                "This term overlaps with an existing term."
+            )
 
 class Class(BaseModel):
     title = models.CharField(max_length=100)
