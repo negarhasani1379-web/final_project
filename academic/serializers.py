@@ -33,6 +33,19 @@ class TermSerializer(serializers.ModelSerializer):
                 "End date cannot be before start date."
             )
 
+        overlapping = Term.objects.filter(
+            start_date__lte=end_date,
+            end_date__gte=start_date,
+        )
+
+        if self.instance:
+            overlapping = overlapping.exclude(pk=self.instance.pk)
+
+        if overlapping.exists():
+            raise serializers.ValidationError(
+                "This term overlaps with an existing term."
+            )
+
         return attrs
 
 
