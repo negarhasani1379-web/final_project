@@ -1,5 +1,8 @@
+from datetime import date
+
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from account.models import User, UserRole
 from core.models import BaseModel
@@ -85,3 +88,19 @@ class TeacherAssignment(BaseModel):
             raise ValidationError(
                 "End date cannot be before start date."
             )
+        if self.classroom_id and self.start_date:
+            overlapping = TeacherAssignment.objects.filter(
+                classroom_id=self.classroom_id,
+                start_date__lte=self.end_date or date.max,
+            ).filter(
+                Q(end_date__isnull=True) | Q(end_date__gte=self.start_date)
+            )
+
+            if self.pk:
+                overlapping = overlapping.exclude(pk=self.pk)
+
+            if overlapping.exists():
+                raise ValidationError(
+                    "This classroom already has a teacher assigned "
+                    "during this period."
+                )

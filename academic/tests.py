@@ -1147,5 +1147,76 @@ class TeacherAssignmentTest(APITestCase):
         self.assertEqual(
             response.data[0]["id"],
             self.classroom.id,
-        )                                                            
-                                    
+        )
+
+    def test_assignment_cannot_overlap_with_existing_assignment(self):
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        teacher_2 = User.objects.create_user(
+            username="teacher_assignment_test_2",
+            password="Test12345",
+            role="teacher",
+        )
+
+        assignment = TeacherAssignment(
+            teacher=teacher_2,
+            classroom=self.classroom,
+            start_date="2026-09-15",
+            end_date="2026-10-15",
+        )
+
+        with self.assertRaises(ValidationError):
+            assignment.full_clean() 
+
+    def test_open_ended_assignment_cannot_overlap_with_new_assignment(self):
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date=None,
+        )
+
+        teacher_2 = User.objects.create_user(
+            username="teacher_assignment_test_2",
+            password="Test12345",
+            role="teacher",
+        )
+
+        assignment = TeacherAssignment(
+            teacher=teacher_2,
+            classroom=self.classroom,
+            start_date="2026-10-01",
+            end_date="2026-11-01",
+        )
+
+        with self.assertRaises(ValidationError):
+            assignment.full_clean() 
+
+    def test_assignments_with_adjacent_dates_are_allowed(self):
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-09-30",
+        )
+
+        teacher_2 = User.objects.create_user(
+            username="teacher_assignment_test_2",
+            password="Test12345",
+            role="teacher",
+        )
+
+        assignment = TeacherAssignment(
+            teacher=teacher_2,
+            classroom=self.classroom,
+            start_date="2026-10-01",
+            end_date="2026-11-01",
+        )
+
+        assignment.full_clean()                                                                              
+                                            
