@@ -1,4 +1,8 @@
+from datetime import date
+
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from account.models import User, UserRole
 from core.models import BaseModel
@@ -19,6 +23,12 @@ class Term(BaseModel):
         choices=TermType.choices,
     )
     
+    def clean(self):
+        if self.end_date < self.start_date:
+            raise ValidationError(
+                "End date cannot be before start date."
+            )
+    
     def __str__(self):
         return self.title
     
@@ -38,7 +48,14 @@ class Class(BaseModel):
         related_name="classes",
     )
 
-    session_duration = models.PositiveIntegerField()
+    
+    session_duration = models.PositiveIntegerField(
+        choices=[
+            (60, "60 minutes"),
+            (90, "90 minutes"),
+            (120, "120 minutes"),
+        ]
+    )
 
 class TeacherAssignment(BaseModel):
     teacher = models.ForeignKey(
@@ -60,3 +77,30 @@ class TeacherAssignment(BaseModel):
         null=True,
         blank=True,
     )
+    def clean(self):
+        super().clean()
+
+        if (
+            self.start_date
+            and self.end_date
+            and self.end_date < self.start_date
+        ):
+            raise ValidationError(
+                "End date cannot be before start date."
+            )
+        if self.classroom_id and self.start_date:
+            overlapping = TeacherAssignment.objects.filter(
+                classroom_id=self.classroom_id,
+                start_date__lte=self.end_date or date.max,
+            ).filter(
+                Q(end_date__isnull=True) | Q(end_date__gte=self.start_date)
+            )
+
+            if self.pk:
+                overlapping = overlapping.exclude(pk=self.pk)
+
+            if overlapping.exists():
+                raise ValidationError(
+                    "This classroom already has a teacher assigned "
+                    "during this period."
+                )

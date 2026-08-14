@@ -1,3 +1,14 @@
-from django.shortcuts import render
+from rest_framework.viewsets import ModelViewSet
 
-# Create your views here.
+from account.permissions import IsEducation
+
+from .models import School
+from .serializers import SchoolSerializer
+
+
+class SchoolViewSet(ModelViewSet):
+    queryset = School.objects.filter(is_deleted=False)
+    serializer_class = SchoolSerializer
+    permission_classes = [IsEducation]
+
+
