@@ -845,7 +845,35 @@ class ClassFilterAPITest(APITestCase):
         self.assertEqual(
             len(response.data),
             0,
-        )                      
+        )
+
+    def test_deleted_class_is_not_returned_in_filtered_list(self):
+        self.client.force_authenticate(user=self.education)
+
+        self.classroom.delete()
+
+        classroom = Class.objects.create(
+            title="Deleted Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        classroom.delete()
+
+        response = self.client.get(
+            f"{self.url}?school={self.school.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            0,
+        )                         
 
 ##########TeacherAssignment########## 
 class TeacherAssignmentTest(APITestCase):
