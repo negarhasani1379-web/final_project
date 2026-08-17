@@ -873,7 +873,22 @@ class ClassFilterAPITest(APITestCase):
         self.assertEqual(
             len(response.data),
             0,
-        )                         
+        ) 
+
+    def test_education_can_list_all_classes_without_filter(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )                            
 
 ##########TeacherAssignment########## 
 class TeacherAssignmentTest(APITestCase):
