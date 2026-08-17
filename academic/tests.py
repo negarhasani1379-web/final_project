@@ -635,6 +635,86 @@ class ClassAPITest(APITestCase):
             0,
         ) 
 
+class ClassFilterAPITest(APITestCase):
+
+    def setUp(self):
+        self.education = User.objects.create_user(
+            username="education_filter_test",
+            password="Test12345",
+            role="education",
+        )
+
+        self.teacher = User.objects.create_user(
+            username="teacher_filter_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        self.other_teacher = User.objects.create_user(
+            username="other_teacher_filter_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        self.school = School.objects.create(
+            name="Test School",
+        )
+
+        self.other_school = School.objects.create(
+            name="Other School",
+        )
+
+        self.term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        self.other_term = Term.objects.create(
+            title="Summer 2026",
+            start_date="2026-06-01",
+            end_date="2026-08-31",
+            term_type="summer",
+        )
+
+        self.classroom = Class.objects.create(
+            title="English Literature",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.other_classroom = Class.objects.create(
+            title="Mathematics",
+            school=self.other_school,
+            term=self.other_term,
+            session_duration=60,
+        )
+
+        self.url = "/api/classes/"
+
+    def test_education_can_filter_classes_by_school(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            f"{self.url}?school={self.school.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )    
 
 ##########TeacherAssignment########## 
 class TeacherAssignmentTest(APITestCase):
