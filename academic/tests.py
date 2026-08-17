@@ -736,7 +736,36 @@ class ClassFilterAPITest(APITestCase):
         self.assertEqual(
             response.data[0]["id"],
             self.classroom.id,
-        )       
+        ) 
+
+    def test_education_can_filter_classes_by_teacher(self):
+        self.client.force_authenticate(user=self.education)
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            f"{self.url}?teacher={self.teacher.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )          
 
 ##########TeacherAssignment########## 
 class TeacherAssignmentTest(APITestCase):
