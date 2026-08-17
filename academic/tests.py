@@ -819,7 +819,33 @@ class ClassFilterAPITest(APITestCase):
         self.assertEqual(
             response.data[0]["id"],
             self.classroom.id,
-        )                  
+        )
+
+    def test_deleted_teacher_assignment_is_not_used_for_teacher_filter(self):
+        self.client.force_authenticate(user=self.education)
+
+        assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        assignment.delete()
+
+        response = self.client.get(
+            f"{self.url}?teacher={self.teacher.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            0,
+        )                      
 
 ##########TeacherAssignment########## 
 class TeacherAssignmentTest(APITestCase):
