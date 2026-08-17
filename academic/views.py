@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
-from account.permissions import IsEducation, IsTeacher
+from account.permissions import IsEducation, IsTeacher, IsTeacherOrEducation
 
 from .models import Class, TeacherAssignment, Term
 from .serializers import ClassSerializer, TeacherAssignmentSerializer, TermSerializer
@@ -24,14 +24,20 @@ class TeacherAssignmentViewSet(ModelViewSet):
     permission_classes = [IsEducation]
 
 class TeacherClassListView(APIView):
-    permission_classes = [IsTeacher]
+    permission_classes = [IsTeacherOrEducation]
 
     def get(self, request):
-        classrooms = Class.objects.filter(
-            teacher_assignments__teacher=request.user,
-            teacher_assignments__is_deleted=False,
-            is_deleted=False,
-        ).distinct()
+        if request.user.role == "teacher":
+            classrooms = Class.objects.filter(
+                teacher_assignments__teacher=request.user,
+                teacher_assignments__is_deleted=False,
+                is_deleted=False,
+            ).distinct()
+
+        else:
+            classrooms = Class.objects.filter(
+                is_deleted=False,
+            )
 
         serializer = ClassSerializer(classrooms, many=True)
 

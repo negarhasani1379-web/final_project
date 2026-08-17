@@ -1078,7 +1078,7 @@ class TeacherAssignmentTest(APITestCase):
             self.classroom.id,
         )
 
-    def test_education_cannot_list_teacher_classes(self):
+    def test_education_can_list_classes(self):
         self.client.force_authenticate(user=self.education)
 
         response = self.client.get(
@@ -1087,7 +1087,7 @@ class TeacherAssignmentTest(APITestCase):
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_403_FORBIDDEN,
+            status.HTTP_200_OK,
         )
 
     def test_multiple_teachers_can_have_same_class_at_different_times(self):
