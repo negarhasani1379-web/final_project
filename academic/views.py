@@ -18,6 +18,31 @@ class ClassViewSet(ModelViewSet):
     serializer_class = ClassSerializer
     permission_classes = [IsEducation]
 
+    def get_queryset(self):
+        queryset = Class.objects.filter(is_deleted=False)
+
+        school_id = self.request.query_params.get("school")
+        term_id = self.request.query_params.get("term")
+        teacher_id = self.request.query_params.get("teacher")
+
+        if school_id:
+            queryset = queryset.filter(
+                school_id=school_id
+            )
+
+        if term_id:
+            queryset = queryset.filter(
+                term_id=term_id
+            )
+
+        if teacher_id:
+            queryset = queryset.filter(
+                teacher_assignments__teacher_id=teacher_id,
+                teacher_assignments__is_deleted=False,
+            )
+
+        return queryset.distinct()
+
 class TeacherAssignmentViewSet(ModelViewSet):
     queryset = TeacherAssignment.objects.filter(is_deleted=False)
     serializer_class = TeacherAssignmentSerializer
