@@ -78,3 +78,53 @@ class SessionReportSerializerTests(TestCase):
         self.assertEqual(report.present_count, 15)
         self.assertEqual(report.absent_count, 2)
         self.assertEqual(report.status, "pending")
+
+    def test_teacher_cannot_create_report_for_another_teacher_class(self):
+        other_teacher = User.objects.create_user(
+            username="other_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        other_classroom = Class.objects.create(
+            title="Other Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        other_assignment = TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=other_classroom,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        other_session = Session.objects.create(
+            classroom=other_classroom,
+            session_number=1,
+            session_date=date.today() - timedelta(days=1),
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": other_session.id,
+            "teacher_assignment": other_assignment.id,
+            "lesson_summary": "Trying to access another teacher's class.",
+            "present_count": 10,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn(
+            "You can only submit reports for your own assignment.",
+            str(serializer.errors),
+        )    
