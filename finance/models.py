@@ -32,17 +32,25 @@ class TeacherTermRate(SoftDeleteModel):
             )
         ]
 
+class SessionReportStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"        
+
 
 class SessionReport(BaseModel):
+
+    session = models.OneToOneField(
+        "academic.Session",
+        on_delete=models.CASCADE,
+        related_name="report",
+    )
+
     teacher_assignment = models.ForeignKey(
         TeacherAssignment,
         on_delete=models.CASCADE,
         related_name="session_reports",
     )
-
-    session_date = models.DateField()
-
-    session_number = models.PositiveIntegerField()
 
     lesson_summary = models.TextField()
 
@@ -50,14 +58,17 @@ class SessionReport(BaseModel):
 
     absent_count = models.PositiveIntegerField()
 
-    status = models.CharField(max_length=30)
+    status = models.CharField(
+        max_length=30,
+        choices=SessionReportStatus.choices,
+        default=SessionReportStatus.PENDING,
+    )
 
     review_comment = models.TextField(
         blank=True,
     )
 
-    is_late = models.BooleanField(default=False)        
-
+    is_late = models.BooleanField(default=False)
 
 
 class Salary(BaseModel):
