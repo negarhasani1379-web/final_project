@@ -85,7 +85,7 @@ class ClassSerializer(serializers.ModelSerializer):
         )
 
         if assignment:
-            return assignment.teacher_id
+            return CurrentTeacherSerializer(assignment.teacher).data
 
         return None   
 
