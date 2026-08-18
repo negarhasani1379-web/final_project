@@ -649,4 +649,23 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)                                                                      
+        self.assertEqual(response.status_code, 400)
+
+    def test_negative_absent_count_returns_400(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Negative absent count.",
+            "present_count": 15,
+            "absent_count": -1,
+        }
+
+        response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)                                                                          
