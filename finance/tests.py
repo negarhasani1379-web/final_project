@@ -602,4 +602,31 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 401)                                                              
+        self.assertEqual(response.status_code, 401)
+
+    def test_session_cannot_have_two_reports(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "First report.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        first_response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+
+        second_response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(second_response.status_code, 400)                                                                  
