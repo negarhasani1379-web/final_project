@@ -4,6 +4,8 @@ from finance.views import (
     SessionReportCreateView,
     SessionReportListView,
     SessionReportReviewListView,
+    SessionReportReviewUpdateView,
+    SessionReportUpdateView,
 )
 
 urlpatterns = [
@@ -18,8 +20,19 @@ urlpatterns = [
         name="session-report-list",
     ),
     path(
-    "session-reports/review/",
-    SessionReportReviewListView.as_view(),
-    name="session-report-review-list",
+        "session-reports/review/",
+        SessionReportReviewListView.as_view(),
+        name="session-report-review-list",
+    ),
+
+    path(
+        "session-reports/<int:pk>/review/",
+        SessionReportReviewUpdateView.as_view(),
+        name="session-report-review-update",
+    ),
+    path(
+        "session-reports/<int:pk>/",
+        SessionReportUpdateView.as_view(),
+        name="session-report-update",
     ),
 ]

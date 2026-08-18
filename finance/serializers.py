@@ -29,8 +29,14 @@ class SessionReportSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context.get("request")
 
-        session = attrs.get("session")
-        teacher_assignment = attrs.get("teacher_assignment")
+        session = attrs.get(
+            "session",
+            self.instance.session if self.instance else None,
+        )
+        teacher_assignment = attrs.get(
+            "teacher_assignment",
+            self.instance.teacher_assignment if self.instance else None,
+        )
 
         if request is None or not request.user.is_authenticated:
             raise serializers.ValidationError(
@@ -58,3 +64,39 @@ class SessionReportSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+    
+
+
+class SessionReportReviewSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        status = attrs.get("status")
+        review_comment = attrs.get("review_comment")
+
+        if status == "rejected" and not review_comment:
+            raise serializers.ValidationError(
+                "Review comment is required when rejecting a session report."
+            )
+
+        return attrs
+    class Meta:
+        model = SessionReport
+        fields = [
+            "id",
+            "session",
+            "teacher_assignment",
+            "lesson_summary",
+            "present_count",
+            "absent_count",
+            "status",
+            "review_comment",
+            "is_late",
+        ]
+        read_only_fields = [
+            "id",
+            "session",
+            "teacher_assignment",
+            "lesson_summary",
+            "present_count",
+            "absent_count",
+            "is_late",
+        ]    

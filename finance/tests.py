@@ -812,4 +812,422 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/review/"
         )
 
-        self.assertEqual(response.status_code, 401)                          
+        self.assertEqual(response.status_code, 401)
+
+
+    def test_education_can_approve_session_report(self):
+        education_user = User.objects.create_user(
+            username="approve_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "approved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "approved")
+
+    def test_education_cannot_change_session_report_content(self):
+        education_user = User.objects.create_user(
+            username="content_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "lesson_summary": "Changed lesson.",
+                "present_count": 100,
+                "absent_count": 0,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.lesson_summary, "Original lesson.")
+        self.assertEqual(report.present_count, 15)
+        self.assertEqual(report.absent_count, 2)                                  
+
+    def test_teacher_cannot_approve_own_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "approved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_education_cannot_reject_without_comment(self):
+        education_user = User.objects.create_user(
+            username="reject_no_comment",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "rejected",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400) 
+
+    def test_education_can_reject_session_report_with_comment(self):
+        education_user = User.objects.create_user(
+            username="reject_with_comment",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "rejected",
+                "review_comment": "Attendance count needs correction.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "rejected")
+        self.assertEqual(
+            report.review_comment,
+            "Attendance count needs correction.",
+        )
+
+
+    def test_teacher_can_edit_rejected_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+            status="rejected",
+            review_comment="Please correct the attendance count.",
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/",
+            {
+                "lesson_summary": "Corrected lesson.",
+                "present_count": 14,
+                "absent_count": 3,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.lesson_summary, "Corrected lesson.")
+        self.assertEqual(report.present_count, 14)
+        self.assertEqual(report.absent_count, 3)
+
+
+    def test_teacher_can_resubmit_rejected_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+            status="rejected",
+            review_comment="Please correct the attendance count.",
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/",
+            {
+                "lesson_summary": "Corrected lesson.",
+                "present_count": 14,
+                "absent_count": 3,
+                "status": "pending",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "pending")
+        self.assertEqual(report.lesson_summary, "Corrected lesson.")
+        self.assertEqual(report.present_count, 14)
+        self.assertEqual(report.absent_count, 3) 
+
+
+    def test_teacher_cannot_edit_approved_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Approved lesson.",
+            present_count=15,
+            absent_count=2,
+            status="approved",
+            review_comment="",
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/",
+            {
+                "lesson_summary": "Trying to change approved report.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_education_cannot_modify_session_report_content(self):
+        education_user = User.objects.create_user(
+            username="education_no_content_change",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+            review_comment="",
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "approved",
+                "lesson_summary": "Changed by education!",
+                "present_count": 100,
+                "absent_count": 0,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "approved")
+        self.assertEqual(report.lesson_summary, "Original lesson.")
+        self.assertEqual(report.present_count, 15)
+        self.assertEqual(report.absent_count, 2)
+
+    def test_teacher_cannot_approve_own_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "approved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_education_can_filter_session_reports_by_school(self):
+        education_user = User.objects.create_user(
+            username="education_filter_school",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="School filter test.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            f"/api/session-reports/review/?school_id={self.school.id}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        returned_ids = [item["id"] for item in response.data]
+
+        self.assertIn(report.id, returned_ids)
+
+    def test_education_can_filter_session_reports_by_class(self):
+        education_user = User.objects.create_user(
+            username="education_filter_class",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Class filter test.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            f"/api/session-reports/review/?classroom_id={self.classroom.id}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        returned_ids = [item["id"] for item in response.data]
+
+        self.assertIn(report.id, returned_ids)
+
+
+    def test_education_can_filter_session_reports_by_teacher(self):
+        education_user = User.objects.create_user(
+            username="education_filter_teacher",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Teacher filter test.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            f"/api/session-reports/review/?teacher_id={self.teacher.id}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        returned_ids = [item["id"] for item in response.data]
+
+        self.assertIn(report.id, returned_ids)
+
+
+    def test_education_can_filter_session_reports_by_date_range(self):
+        education_user = User.objects.create_user(
+            username="education_filter_date",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Date filter test.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            "/api/session-reports/review/"
+            f"?start_date={self.session.session_date}"
+            f"&end_date={self.session.session_date}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        returned_ids = [item["id"] for item in response.data]
+
+        self.assertIn(report.id, returned_ids)            
