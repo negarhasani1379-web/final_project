@@ -492,7 +492,7 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 403)
 
 
     def test_teacher_cannot_create_report_for_another_teacher_assignment(self):
