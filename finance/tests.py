@@ -804,4 +804,12 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/review/"
         )
 
-        self.assertEqual(response.status_code, 403)                       
+        self.assertEqual(response.status_code, 403) 
+
+
+    def test_unauthenticated_user_cannot_access_session_report_review(self):
+        response = self.client.get(
+            "/api/session-reports/review/"
+        )
+
+        self.assertEqual(response.status_code, 401)                          
