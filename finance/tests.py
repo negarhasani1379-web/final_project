@@ -1291,4 +1291,83 @@ class SessionReportAPITests(APITestCase):
 
         returned_ids = [item["id"] for item in response.data]
 
-        self.assertIn(report.id, returned_ids)            
+        self.assertIn(report.id, returned_ids)
+
+
+    def test_full_session_report_workflow(self):
+        education_user = User.objects.create_user(
+            username="workflow_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        # 1. Teacher creates the report
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.post(
+            "/api/session-reports/",
+            {
+                "session": self.session.id,
+                "teacher_assignment": self.assignment.id,
+                "lesson_summary": "Initial lesson.",
+                "present_count": 15,
+                "absent_count": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        report_id = response.data["id"]
+
+        # 2. Education rejects the report
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report_id}/review/",
+            {
+                "status": "rejected",
+                "review_comment": "Please correct the attendance count.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # 3. Teacher edits and resubmits the rejected report
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report_id}/",
+            {
+                "lesson_summary": "Corrected lesson.",
+                "present_count": 14,
+                "absent_count": 3,
+                "status": "pending",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # 4. Education approves the resubmitted report
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report_id}/review/",
+            {
+                "status": "approved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report = SessionReport.objects.get(id=report_id)
+
+        self.assertEqual(report.status, "approved")
+        self.assertEqual(
+            report.lesson_summary,
+            "Corrected lesson.",
+        )
+        self.assertEqual(report.present_count, 14)
+        self.assertEqual(report.absent_count, 3)
