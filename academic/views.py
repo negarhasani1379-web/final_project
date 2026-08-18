@@ -2,10 +2,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
-from account.permissions import IsEducation, IsTeacher, IsTeacherOrEducation
+from account.permissions import IsEducation, IsTeacherOrEducation
 
 from .models import Class, TeacherAssignment, Term
-from .serializers import ClassSerializer, TeacherAssignmentSerializer, TermSerializer
+from .serializers import (
+    ClassDetailSerializer,
+    ClassSerializer,
+    TeacherAssignmentSerializer,
+    TermSerializer,
+)
 
 
 class TermViewSet(ModelViewSet):
@@ -17,6 +22,12 @@ class ClassViewSet(ModelViewSet):
     queryset = Class.objects.filter(is_deleted=False)
     serializer_class = ClassSerializer
     permission_classes = [IsEducation]
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ClassDetailSerializer
+
+        return ClassSerializer
 
     def get_queryset(self):
         queryset = Class.objects.filter(is_deleted=False)
