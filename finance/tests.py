@@ -276,6 +276,29 @@ class SessionReportSerializerTests(TestCase):
             serializer.errors,
         )
 
+    def test_new_report_status_is_pending(self):
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Testing default report status.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        report = serializer.save()
+
+        self.assertEqual(report.status, "pending")    
+
 
 class SessionModelTests(TestCase):
 
