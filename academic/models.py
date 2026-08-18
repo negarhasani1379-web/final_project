@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models import Q
 
 from account.models import User, UserRole
-from core.models import BaseModel
+from core.models import BaseModel, SoftDeleteModel
 from school.models import School
 
 
@@ -14,7 +14,7 @@ class TermType(models.TextChoices):
     SUMMER = "summer", "Summer"
 
 
-class Term(BaseModel):
+class Term(SoftDeleteModel):
     title = models.CharField(max_length=100)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -42,7 +42,7 @@ class Term(BaseModel):
                 "This term overlaps with an existing term."
             )
 
-class Class(BaseModel):
+class Class(SoftDeleteModel):
     title = models.CharField(max_length=100)
 
     school = models.ForeignKey(
@@ -66,7 +66,7 @@ class Class(BaseModel):
         ]
     )
 
-class TeacherAssignment(BaseModel):
+class TeacherAssignment(SoftDeleteModel):
     teacher = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
