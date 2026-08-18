@@ -1,3 +1,5 @@
+from datetime import date, datetime, time
+
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -58,13 +60,30 @@ class SessionReportSerializer(serializers.ModelSerializer):
                 "The session does not belong to the assigned classroom."
             )
 
-        if session.session_date >= timezone.localdate():
+        if session.session_date >= timezone.now():
             raise serializers.ValidationError(
                 "A report can only be submitted after the session."
             )
 
         return attrs
     
+    def create(self, validated_data):
+        session = validated_data["session"]
+
+        now = timezone.localtime()
+
+        session_datetime = timezone.make_aware(
+            datetime.combine(
+                session.session_date,
+                time.min,
+            )
+        )
+
+        validated_data["is_late"] = (
+            now - session_datetime
+        ).total_seconds() > 48 * 60 * 60
+
+        return super().create(validated_data)    
 
 
 class SessionReportReviewSerializer(serializers.ModelSerializer):
