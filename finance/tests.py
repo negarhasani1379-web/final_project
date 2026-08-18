@@ -963,4 +963,36 @@ class SessionReportAPITests(APITestCase):
         self.assertEqual(
             report.review_comment,
             "Attendance count needs correction.",
-        )       
+        )
+
+
+    def test_teacher_can_edit_rejected_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+            status="rejected",
+            review_comment="Please correct the attendance count.",
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/",
+            {
+                "lesson_summary": "Corrected lesson.",
+                "present_count": 14,
+                "absent_count": 3,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.lesson_summary, "Corrected lesson.")
+        self.assertEqual(report.present_count, 14)
+        self.assertEqual(report.absent_count, 3)           
