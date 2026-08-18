@@ -128,3 +128,34 @@ class SessionReportSerializerTests(TestCase):
             "You can only submit reports for your own assignment.",
             str(serializer.errors),
         )    
+
+
+    def test_teacher_cannot_create_report_for_future_session(self):
+        future_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=date.today() + timedelta(days=1),
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": future_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Future lesson.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn(
+            "A report can only be submitted after the session.",
+            str(serializer.errors),
+        )
