@@ -694,3 +694,40 @@ class SessionReportAPITests(APITestCase):
             response.data[0]["teacher_assignment"],
             self.assignment.id,
         )
+
+
+    def test_teacher_cannot_see_another_teacher_report(self):
+        other_teacher = User.objects.create_user(
+            username="other_list_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        other_assignment = TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=self.classroom,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        other_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=date.today() - timedelta(days=2),
+        )
+        SessionReport.objects.create(
+            session=other_session,
+            teacher_assignment=other_assignment,
+            lesson_summary="Other teacher report.",
+            present_count=10,
+            absent_count=5,
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.get(
+            "/api/session-reports/list/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)    
