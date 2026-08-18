@@ -551,4 +551,37 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)                                                      
+        self.assertEqual(response.status_code, 400)
+
+
+    def test_session_must_belong_to_assignment_class_api(self):
+        other_classroom = Class.objects.create(
+            title="Other API Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        other_session = Session.objects.create(
+            classroom=other_classroom,
+            session_number=1,
+            session_date=date.today() - timedelta(days=1),
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        data = {
+            "session": other_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Mismatched classroom.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)                                                          
