@@ -789,4 +789,19 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/review/"
         )
 
-        self.assertEqual(response.status_code, 403)                    
+        self.assertEqual(response.status_code, 403) 
+
+    def test_finance_cannot_access_session_report_review(self):
+        finance_user = User.objects.create_user(
+            username="review_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.client.force_authenticate(user=finance_user)
+
+        response = self.client.get(
+            "/api/session-reports/review/"
+        )
+
+        self.assertEqual(response.status_code, 403)                       
