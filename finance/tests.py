@@ -310,4 +310,21 @@ class SessionModelTests(TestCase):
                 classroom=self.classroom,
                 session_number=1,
                 session_date=date.today() - timedelta(days=1),
-            )                       
+            )
+
+
+    def test_session_date_must_be_unique_per_class(self):
+        session_date = date.today() - timedelta(days=2)
+
+        Session.objects.create(
+            classroom=self.classroom,
+            session_number=1,
+            session_date=session_date,
+        )
+
+        with self.assertRaises(Exception):
+            Session.objects.create(
+                classroom=self.classroom,
+                session_number=2,
+                session_date=session_date,
+            )                               
