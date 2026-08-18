@@ -76,7 +76,7 @@ class Session(SoftDeleteModel):
 
     session_number = models.PositiveIntegerField()
 
-    session_date = models.DateField()
+    session_date = models.DateTimeField()
 
     class Meta:
         constraints = [
