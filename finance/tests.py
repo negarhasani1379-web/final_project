@@ -159,3 +159,33 @@ class SessionReportSerializerTests(TestCase):
             "A report can only be submitted after the session.",
             str(serializer.errors),
         )
+
+    def test_education_officer_cannot_create_report(self):
+        education_user = User.objects.create_user(
+            username="education_test",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = education_user
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Education officer trying to create report.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn(
+            "Only teachers can create session reports.",
+            str(serializer.errors),
+        )    
