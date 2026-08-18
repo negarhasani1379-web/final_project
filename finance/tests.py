@@ -188,4 +188,66 @@ class SessionReportSerializerTests(TestCase):
         self.assertIn(
             "Only teachers can create session reports.",
             str(serializer.errors),
-        )    
+        ) 
+
+
+    def test_session_must_belong_to_assignment_class(self):
+        other_classroom = Class.objects.create(
+            title="Another Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        other_session = Session.objects.create(
+            classroom=other_classroom,
+            session_number=1,
+            session_date=date.today() - timedelta(days=1),
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": other_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Mismatched session and assignment.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn(
+            "The session does not belong to the assigned classroom.",
+            str(serializer.errors),
+        )
+
+    def test_present_count_cannot_be_negative(self):
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Valid lesson.",
+            "present_count": -1,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn(
+            "present_count",
+            serializer.errors,
+        )           
