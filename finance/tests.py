@@ -348,7 +348,37 @@ class SessionReportSerializerTests(TestCase):
 
         report = serializer.save()
 
-        self.assertEqual(report.review_comment, "")        
+        self.assertEqual(report.review_comment, "")
+
+
+    def test_session_report_is_marked_late_after_48_hours(self):
+        old_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=date.today() - timedelta(days=3),
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": old_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Late submission test.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        report = serializer.save()
+
+        self.assertTrue(report.is_late)            
 
 
 class SessionModelTests(TestCase):
