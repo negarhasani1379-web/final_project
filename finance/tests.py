@@ -880,3 +880,24 @@ class SessionReportAPITests(APITestCase):
         self.assertEqual(report.lesson_summary, "Original lesson.")
         self.assertEqual(report.present_count, 15)
         self.assertEqual(report.absent_count, 2)                                  
+
+    def test_teacher_cannot_approve_own_session_report(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "approved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
