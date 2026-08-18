@@ -66,6 +66,30 @@ class Class(SoftDeleteModel):
         ]
     )
 
+
+class Session(SoftDeleteModel):
+    classroom = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name="sessions",
+    )
+
+    session_number = models.PositiveIntegerField()
+
+    session_date = models.DateField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["classroom", "session_number"],
+                name="unique_session_number_per_class",
+            ),
+            models.UniqueConstraint(
+                fields=["classroom", "session_date"],
+                name="unique_session_date_per_class",
+            ),
+        ]    
+
 class TeacherAssignment(SoftDeleteModel):
     teacher = models.ForeignKey(
         User,
