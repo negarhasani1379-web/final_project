@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from rest_framework import status
@@ -633,8 +635,39 @@ class ClassAPITest(APITestCase):
         self.assertEqual(
             len(response.data),
             0,
-        ) 
+        )
+    
+    def test_class_detail_returns_current_teacher_summary(self):
+        classroom = Class.objects.create(
+            title="Test Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
 
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=classroom,
+            start_date=date.today(),
+            end_date=None,
+        )
+
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            f"{self.url}{classroom.id}/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.data["current_teacher"],
+            {
+                "id": self.teacher.id,
+                "username": self.teacher.username,
+            },
+        )
+###########ClassFilterAPITest#########
 class ClassFilterAPITest(APITestCase):
 
     def setUp(self):

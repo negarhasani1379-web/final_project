@@ -3,6 +3,8 @@ from datetime import date
 from django.db.models import Q
 from rest_framework import serializers
 
+from account.models import User
+
 from .models import Class, TeacherAssignment, Term
 
 
@@ -48,6 +50,13 @@ class TermSerializer(serializers.ModelSerializer):
 
         return attrs
 
+class CurrentTeacherSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+        )
 
 class ClassSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,6 +69,35 @@ class ClassSerializer(serializers.ModelSerializer):
             "session_duration",
         )
 
+
+class ClassDetailSerializer(ClassSerializer):
+    current_teacher = serializers.SerializerMethodField()
+
+    class Meta(ClassSerializer.Meta):
+        fields = ClassSerializer.Meta.fields + (
+            "current_teacher",
+        )
+
+    def get_current_teacher(self, obj):
+        assignment = (
+            TeacherAssignment.objects
+            .filter(
+                classroom=obj,
+                is_deleted=False,
+                end_date__isnull=True,
+            )
+            .select_related("teacher")
+            .first()
+        )
+
+        if assignment:
+            return CurrentTeacherSerializer(
+                assignment.teacher
+            ).data
+
+        return None
+
+            
 class TeacherAssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeacherAssignment
