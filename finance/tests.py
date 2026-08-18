@@ -322,7 +322,31 @@ class SessionReportSerializerTests(TestCase):
 
         report = serializer.save()
 
-        self.assertEqual(report.status, "pending")    
+        self.assertEqual(report.status, "pending")
+
+
+    def test_new_report_review_comment_is_empty(self):
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Testing review comment.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        report = serializer.save()
+
+        self.assertEqual(report.review_comment, "")        
 
 
 class SessionModelTests(TestCase):
