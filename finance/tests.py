@@ -747,4 +747,12 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/list/"
         )
 
-        self.assertEqual(response.status_code, 403)        
+        self.assertEqual(response.status_code, 403)
+
+
+    def test_unauthenticated_user_cannot_list_session_reports(self):
+        response = self.client.get(
+            "/api/session-reports/list/"
+        )
+
+        self.assertEqual(response.status_code, 401)            
