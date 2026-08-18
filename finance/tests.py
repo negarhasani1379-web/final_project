@@ -492,4 +492,37 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)                                              
+        self.assertEqual(response.status_code, 400)
+
+
+    def test_teacher_cannot_create_report_for_another_teacher_assignment(self):
+        other_teacher = User.objects.create_user(
+            username="other_api_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        other_assignment = TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=self.classroom,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": other_assignment.id,
+            "lesson_summary": "Unauthorized teacher assignment.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)                                                  
