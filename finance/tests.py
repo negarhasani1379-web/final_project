@@ -780,4 +780,13 @@ class SessionReportAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)                
+        self.assertEqual(len(response.data), 1)
+
+    def test_teacher_cannot_access_session_report_review(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.get(
+            "/api/session-reports/review/"
+        )
+
+        self.assertEqual(response.status_code, 403)                    
