@@ -1,9 +1,6 @@
-from datetime import date, datetime, time
-
 from django.utils import timezone
 from rest_framework import serializers
 
-from academic.models import TeacherAssignment
 from finance.models import SessionReport
 
 
@@ -70,14 +67,8 @@ class SessionReportSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         session = validated_data["session"]
 
-        now = timezone.localtime()
-
-        session_datetime = timezone.make_aware(
-            datetime.combine(
-                session.session_date,
-                time.min,
-            )
-        )
+        now = timezone.now()
+        session_datetime = session.session_date
 
         validated_data["is_late"] = (
             now - session_datetime
