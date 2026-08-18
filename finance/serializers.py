@@ -58,3 +58,29 @@ class SessionReportSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+    
+
+
+class SessionReportReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionReport
+        fields = [
+            "id",
+            "session",
+            "teacher_assignment",
+            "lesson_summary",
+            "present_count",
+            "absent_count",
+            "status",
+            "review_comment",
+            "is_late",
+        ]
+        read_only_fields = [
+            "id",
+            "session",
+            "teacher_assignment",
+            "lesson_summary",
+            "present_count",
+            "absent_count",
+            "is_late",
+        ]    

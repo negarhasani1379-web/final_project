@@ -3,7 +3,10 @@ from rest_framework.permissions import IsAuthenticated
 
 from account.permissions import IsEducation, IsTeacher
 from finance.models import SessionReport
-from finance.serializers import SessionReportSerializer
+from finance.serializers import (
+    SessionReportReviewSerializer,
+    SessionReportSerializer,
+)
 
 
 class SessionReportCreateView(generics.CreateAPIView):
@@ -21,8 +24,11 @@ class SessionReportListView(generics.ListAPIView):
         )
     
 class SessionReportReviewListView(generics.ListAPIView):
+    queryset = SessionReport.objects.all()
     serializer_class = SessionReportSerializer
+    permission_classes = [IsAuthenticated, IsEducation]    
+    
+class SessionReportReviewUpdateView(generics.UpdateAPIView):
+    queryset = SessionReport.objects.all()
+    serializer_class = SessionReportReviewSerializer
     permission_classes = [IsAuthenticated, IsEducation]
-
-    def get_queryset(self):
-        return SessionReport.objects.all()    
