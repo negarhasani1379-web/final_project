@@ -927,4 +927,40 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)    
+        self.assertEqual(response.status_code, 400) 
+
+    def test_education_can_reject_session_report_with_comment(self):
+        education_user = User.objects.create_user(
+            username="reject_with_comment",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "rejected",
+                "review_comment": "Attendance count needs correction.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "rejected")
+        self.assertEqual(
+            report.review_comment,
+            "Attendance count needs correction.",
+        )       
