@@ -250,4 +250,28 @@ class SessionReportSerializerTests(TestCase):
         self.assertIn(
             "present_count",
             serializer.errors,
-        )           
+        )
+
+    def test_absent_count_cannot_be_negative(self):
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Valid lesson.",
+            "present_count": 15,
+            "absent_count": -1,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn(
+            "absent_count",
+            serializer.errors,
+        )               
