@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIRequestFactory, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -48,7 +49,7 @@ class SessionReportSerializerTests(TestCase):
         self.session = Session.objects.create(
             classroom=self.classroom,
             session_number=1,
-            session_date=date.today() - timedelta(days=1),
+            session_date=timezone.now() - timedelta(days=1),
         )
 
     def test_teacher_can_create_report_for_own_session(self):
@@ -105,7 +106,7 @@ class SessionReportSerializerTests(TestCase):
         other_session = Session.objects.create(
             classroom=other_classroom,
             session_number=1,
-            session_date=date.today() - timedelta(days=1),
+            session_date=timezone.now() - timedelta(days=1),
         )
 
         request = APIRequestFactory().post("/fake-url/")
@@ -136,7 +137,7 @@ class SessionReportSerializerTests(TestCase):
         future_session = Session.objects.create(
             classroom=self.classroom,
             session_number=2,
-            session_date=date.today() + timedelta(days=1),
+            session_date=timezone.now() + timedelta(days=1),
         )
 
         request = APIRequestFactory().post("/fake-url/")
@@ -204,7 +205,7 @@ class SessionReportSerializerTests(TestCase):
         other_session = Session.objects.create(
             classroom=other_classroom,
             session_number=1,
-            session_date=date.today() - timedelta(days=1),
+            session_date=timezone.now() - timedelta(days=1),
         )
 
         request = APIRequestFactory().post("/fake-url/")
@@ -348,7 +349,67 @@ class SessionReportSerializerTests(TestCase):
 
         report = serializer.save()
 
-        self.assertEqual(report.review_comment, "")        
+        self.assertEqual(report.review_comment, "")
+
+
+    def test_session_report_is_marked_late_after_48_hours(self):
+        old_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=timezone.now() - timedelta(days=3),
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": old_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Late submission test.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        report = serializer.save()
+
+        self.assertTrue(report.is_late) 
+
+
+    def test_session_report_is_not_late_within_48_hours(self):
+        recent_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=3,
+            session_date=timezone.now() - timedelta(hours=47),
+        )
+
+        request = APIRequestFactory().post("/fake-url/")
+        request.user = self.teacher
+
+        data = {
+            "session": recent_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "On-time submission test.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        serializer = SessionReportSerializer(
+            data=data,
+            context={"request": request},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+        report = serializer.save()
+
+        self.assertFalse(report.is_late)         
 
 
 class SessionModelTests(TestCase):
@@ -376,19 +437,19 @@ class SessionModelTests(TestCase):
         Session.objects.create(
             classroom=self.classroom,
             session_number=1,
-            session_date=date.today() - timedelta(days=2),
+            session_date=timezone.now() - timedelta(days=2),
         )
 
         with self.assertRaises(Exception):
             Session.objects.create(
                 classroom=self.classroom,
                 session_number=1,
-                session_date=date.today() - timedelta(days=1),
+                session_date=timezone.now() - timedelta(days=1),
             )
 
 
     def test_session_date_must_be_unique_per_class(self):
-        session_date = date.today() - timedelta(days=2)
+        session_date = timezone.now() - timedelta(days=2)
 
         Session.objects.create(
             classroom=self.classroom,
@@ -441,7 +502,7 @@ class SessionReportAPITests(APITestCase):
         self.session = Session.objects.create(
             classroom=self.classroom,
             session_number=1,
-            session_date=date.today() - timedelta(days=1),
+            session_date=timezone.now() - timedelta(days=1),
         )
 
     def test_teacher_can_create_session_report(self):
@@ -533,7 +594,7 @@ class SessionReportAPITests(APITestCase):
         future_session = Session.objects.create(
             classroom=self.classroom,
             session_number=2,
-            session_date=date.today() + timedelta(days=1),
+            session_date=timezone.now() + timedelta(days=1),
         )
 
         self.client.force_authenticate(user=self.teacher)
@@ -566,7 +627,7 @@ class SessionReportAPITests(APITestCase):
         other_session = Session.objects.create(
             classroom=other_classroom,
             session_number=1,
-            session_date=date.today() - timedelta(days=1),
+            session_date=timezone.now() - timedelta(days=1),
         )
 
         self.client.force_authenticate(user=self.teacher)
@@ -713,7 +774,7 @@ class SessionReportAPITests(APITestCase):
         other_session = Session.objects.create(
             classroom=self.classroom,
             session_number=2,
-            session_date=date.today() - timedelta(days=2),
+            session_date=timezone.now() - timedelta(days=2),
         )
         SessionReport.objects.create(
             session=other_session,
