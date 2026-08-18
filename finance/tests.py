@@ -812,4 +812,36 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/review/"
         )
 
-        self.assertEqual(response.status_code, 401)                          
+        self.assertEqual(response.status_code, 401)
+
+
+    def test_education_can_approve_session_report(self):
+        education_user = User.objects.create_user(
+            username="approve_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "approved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "approved")                              
