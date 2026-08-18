@@ -901,3 +901,30 @@ class SessionReportAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+    def test_education_cannot_reject_without_comment(self):
+        education_user = User.objects.create_user(
+            username="reject_no_comment",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="English grammar lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "status": "rejected",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)    
