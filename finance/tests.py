@@ -1143,3 +1143,31 @@ class SessionReportAPITests(APITestCase):
         returned_ids = [item["id"] for item in response.data]
 
         self.assertIn(report.id, returned_ids)
+
+    def test_education_can_filter_session_reports_by_class(self):
+        education_user = User.objects.create_user(
+            username="education_filter_class",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Class filter test.",
+            present_count=15,
+            absent_count=2,
+            status="pending",
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            f"/api/session-reports/review/?classroom_id={self.classroom.id}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        returned_ids = [item["id"] for item in response.data]
+
+        self.assertIn(report.id, returned_ids)    
