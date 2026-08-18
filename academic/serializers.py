@@ -59,8 +59,6 @@ class CurrentTeacherSerializer(serializers.ModelSerializer):
         )
 
 class ClassSerializer(serializers.ModelSerializer):
-    current_teacher = serializers.SerializerMethodField()
-
     class Meta:
         model = Class
         fields = (
@@ -69,6 +67,14 @@ class ClassSerializer(serializers.ModelSerializer):
             "school",
             "term",
             "session_duration",
+        )
+
+
+class ClassDetailSerializer(ClassSerializer):
+    current_teacher = serializers.SerializerMethodField()
+
+    class Meta(ClassSerializer.Meta):
+        fields = ClassSerializer.Meta.fields + (
             "current_teacher",
         )
 
@@ -85,10 +91,13 @@ class ClassSerializer(serializers.ModelSerializer):
         )
 
         if assignment:
-            return CurrentTeacherSerializer(assignment.teacher).data
+            return CurrentTeacherSerializer(
+                assignment.teacher
+            ).data
 
-        return None   
+        return None
 
+            
 class TeacherAssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeacherAssignment
