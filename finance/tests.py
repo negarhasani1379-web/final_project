@@ -466,4 +466,30 @@ class SessionReportAPITests(APITestCase):
             response.data["teacher_assignment"],
             self.assignment.id,
         )
-        self.assertEqual(response.data["status"], "pending")                                          
+        self.assertEqual(response.data["status"], "pending")
+
+
+    def test_non_teacher_cannot_create_session_report(self):
+        education_user = User.objects.create_user(
+            username="api_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Unauthorized report.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)                                              
