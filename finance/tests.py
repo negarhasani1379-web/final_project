@@ -525,4 +525,30 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)                                                  
+        self.assertEqual(response.status_code, 400)
+
+
+    def test_teacher_cannot_create_report_for_future_session(self):
+        future_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=date.today() + timedelta(days=1),
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        data = {
+            "session": future_session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Future session report.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)                                                      
