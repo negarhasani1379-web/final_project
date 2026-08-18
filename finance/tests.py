@@ -274,4 +274,40 @@ class SessionReportSerializerTests(TestCase):
         self.assertIn(
             "absent_count",
             serializer.errors,
-        )               
+        )
+
+
+class SessionModelTests(TestCase):
+
+    def setUp(self):
+        self.school = School.objects.create(
+            name="Session Test School",
+        )
+
+        self.term = Term.objects.create(
+            title="Session Test Term",
+            start_date=date.today() - timedelta(days=30),
+            end_date=date.today() + timedelta(days=30),
+            term_type="normal",
+        )
+
+        self.classroom = Class.objects.create(
+            title="Session Test Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+    def test_session_number_must_be_unique_per_class(self):
+        Session.objects.create(
+            classroom=self.classroom,
+            session_number=1,
+            session_date=date.today() - timedelta(days=2),
+        )
+
+        with self.assertRaises(Exception):
+            Session.objects.create(
+                classroom=self.classroom,
+                session_number=1,
+                session_date=date.today() - timedelta(days=1),
+            )                       
