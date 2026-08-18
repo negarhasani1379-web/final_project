@@ -1,7 +1,8 @@
 from datetime import date, timedelta
 
 from django.test import TestCase
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIRequestFactory, APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
@@ -399,4 +400,70 @@ class SessionModelTests(TestCase):
                 classroom=self.classroom,
                 session_number=2,
                 session_date=session_date,
-            )                               
+            ) 
+
+
+class SessionReportAPITests(APITestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="api_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="API Test School",
+        )
+
+        self.term = Term.objects.create(
+            title="API Test Term",
+            start_date=date.today() - timedelta(days=30),
+            end_date=date.today() + timedelta(days=30),
+            term_type="normal",
+        )
+
+        self.classroom = Class.objects.create(
+            title="API Test Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=1,
+            session_date=date.today() - timedelta(days=1),
+        )
+
+    def test_teacher_can_create_session_report(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        data = {
+            "session": self.session.id,
+            "teacher_assignment": self.assignment.id,
+            "lesson_summary": "Introduction to English grammar.",
+            "present_count": 15,
+            "absent_count": 2,
+        }
+
+        response = self.client.post(
+            "/api/session-reports/",
+            data,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["session"], self.session.id)
+        self.assertEqual(
+            response.data["teacher_assignment"],
+            self.assignment.id,
+        )
+        self.assertEqual(response.data["status"], "pending")                                          
