@@ -755,4 +755,29 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/list/"
         )
 
-        self.assertEqual(response.status_code, 401)            
+        self.assertEqual(response.status_code, 401)
+
+
+    def test_education_can_list_session_reports_for_review(self):
+        education_user = User.objects.create_user(
+            username="review_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Report for education review.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            "/api/session-reports/review/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)                
