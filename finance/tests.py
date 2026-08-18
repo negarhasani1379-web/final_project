@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
+from finance.models import SessionReport
 from finance.serializers import SessionReportSerializer
 from school.models import School
 
@@ -668,4 +669,28 @@ class SessionReportAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)                                                                          
+        self.assertEqual(response.status_code, 400)
+
+
+
+    def test_teacher_can_list_own_session_reports(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="My report.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        response = self.client.get(
+            "/api/session-reports/list/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(
+            response.data[0]["teacher_assignment"],
+            self.assignment.id,
+        )
