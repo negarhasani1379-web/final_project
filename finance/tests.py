@@ -844,4 +844,39 @@ class SessionReportAPITests(APITestCase):
 
         report.refresh_from_db()
 
-        self.assertEqual(report.status, "approved")                              
+        self.assertEqual(report.status, "approved")
+
+    def test_education_cannot_change_session_report_content(self):
+        education_user = User.objects.create_user(
+            username="content_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/review/",
+            {
+                "lesson_summary": "Changed lesson.",
+                "present_count": 100,
+                "absent_count": 0,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.lesson_summary, "Original lesson.")
+        self.assertEqual(report.present_count, 15)
+        self.assertEqual(report.absent_count, 2)                                  
