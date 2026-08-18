@@ -32,3 +32,19 @@ class SessionReportReviewUpdateView(generics.UpdateAPIView):
     queryset = SessionReport.objects.all()
     serializer_class = SessionReportReviewSerializer
     permission_classes = [IsAuthenticated, IsEducation]
+
+
+class SessionReportUpdateView(generics.UpdateAPIView):
+    serializer_class = SessionReportSerializer
+    permission_classes = [IsAuthenticated, IsTeacher]
+
+    def get_queryset(self):
+        return SessionReport.objects.filter(
+            teacher_assignment__teacher=self.request.user,
+            status="rejected",
+        )
+    def perform_update(self, serializer):
+        serializer.save(
+            status="pending",
+            review_comment="",
+        )
