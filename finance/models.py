@@ -2,10 +2,10 @@ from django.db import models
 
 from academic.models import TeacherAssignment, Term
 from account.models import User, UserRole
-from core.models import BaseModel
+from core.models import BaseModel, SoftDeleteModel
 
 
-class TeacherTermRate(BaseModel):
+class TeacherTermRate(SoftDeleteModel):
     teacher = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
