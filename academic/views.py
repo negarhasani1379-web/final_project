@@ -4,10 +4,11 @@ from rest_framework.viewsets import ModelViewSet
 
 from account.permissions import IsEducation, IsTeacherOrEducation
 
-from .models import Class, TeacherAssignment, Term
+from .models import Class, Session, TeacherAssignment, Term
 from .serializers import (
     ClassDetailSerializer,
     ClassSerializer,
+    SessionSerializer,
     TeacherAssignmentSerializer,
     TermSerializer,
 )
@@ -78,3 +79,30 @@ class TeacherClassListView(APIView):
         serializer = ClassSerializer(classrooms, many=True)
 
         return Response(serializer.data)
+    
+
+class SessionViewSet(ModelViewSet):
+    queryset = Session.objects.filter(
+        is_deleted=False
+    )
+    serializer_class = SessionSerializer
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [IsTeacherOrEducation()]
+
+        return [IsEducation()]
+
+    def get_queryset(self):
+        queryset = Session.objects.filter(
+            is_deleted=False
+        )
+
+        if self.request.user.role == "teacher":
+            queryset = queryset.filter(
+                classroom__teacher_assignments__teacher=self.request.user,
+                classroom__teacher_assignments__is_deleted=False,
+                classroom__is_deleted=False,
+            ).distinct()
+
+        return queryset

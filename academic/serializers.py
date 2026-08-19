@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from account.models import User
 
-from .models import Class, TeacherAssignment, Term
+from .models import Class, Session, TeacherAssignment, Term
 
 
 class TermSerializer(serializers.ModelSerializer):
@@ -68,6 +68,16 @@ class ClassSerializer(serializers.ModelSerializer):
             "term",
             "session_duration",
         )
+
+class SessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Session
+        fields = (
+            "id",
+            "classroom",
+            "session_number",
+            "session_date",
+        )        
 
 
 class ClassDetailSerializer(ClassSerializer):
