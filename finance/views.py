@@ -24,9 +24,22 @@ class SessionReportListView(generics.ListAPIView):
         )
     
 class SessionReportReviewListView(generics.ListAPIView):
-    queryset = SessionReport.objects.all()
+
     serializer_class = SessionReportSerializer
-    permission_classes = [IsAuthenticated, IsEducation]    
+
+    permission_classes = [IsAuthenticated, IsEducation]
+
+    def get_queryset(self):
+        queryset = SessionReport.objects.all()
+
+        school_id = self.request.query_params.get("school")
+
+        if school_id:
+            queryset = queryset.filter(
+                session__classroom__school_id=school_id
+            )
+
+        return queryset    
     
 class SessionReportReviewUpdateView(generics.UpdateAPIView):
     queryset = SessionReport.objects.all()
