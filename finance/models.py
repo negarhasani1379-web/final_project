@@ -68,6 +68,11 @@ class SessionReport(BaseModel):
         blank=True,
     )
 
+    rejected_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     is_late = models.BooleanField(default=False)
 
 
