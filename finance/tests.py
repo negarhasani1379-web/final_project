@@ -1196,7 +1196,7 @@ class SessionReportAPITests(APITestCase):
         self.client.force_authenticate(user=education_user)
 
         response = self.client.get(
-            f"/api/session-reports/review/?school_id={self.school.id}"
+            f"/api/session-reports/review/?school={self.school.id}"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1224,7 +1224,7 @@ class SessionReportAPITests(APITestCase):
         self.client.force_authenticate(user=education_user)
 
         response = self.client.get(
-            f"/api/session-reports/review/?classroom_id={self.classroom.id}"
+            f"/api/session-reports/review/?classroom={self.classroom.id}"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1253,7 +1253,7 @@ class SessionReportAPITests(APITestCase):
         self.client.force_authenticate(user=education_user)
 
         response = self.client.get(
-            f"/api/session-reports/review/?teacher_id={self.teacher.id}"
+           f"/api/session-reports/review/?teacher={self.teacher.id}"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1283,8 +1283,8 @@ class SessionReportAPITests(APITestCase):
 
         response = self.client.get(
             "/api/session-reports/review/"
-            f"?start_date={self.session.session_date}"
-            f"&end_date={self.session.session_date}"
+            f"?date_from={self.session.session_date.date()}"
+            f"&date_to={self.session.session_date.date()}"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1371,3 +1371,13 @@ class SessionReportAPITests(APITestCase):
         )
         self.assertEqual(report.present_count, 14)
         self.assertEqual(report.absent_count, 3)
+
+
+    def test_teacher_cannot_access_session_report_review_list(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.get(
+            "/api/session-reports/review/"
+        )
+
+        self.assertEqual(response.status_code, 403)    
