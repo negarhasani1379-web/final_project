@@ -1,5 +1,8 @@
+from django.db.models import Count, Q
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from account.permissions import IsEducation, IsTeacher
 from finance.models import SessionReport
@@ -85,3 +88,46 @@ class SessionReportUpdateView(generics.UpdateAPIView):
             status="pending",
             review_comment="",
         )
+
+class TeacherMonthlyReportSummaryView(APIView):
+    permission_classes = [IsTeacher]
+
+    def get(self, request):
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+
+        if not month or not year:
+            return Response(
+                {
+                    "detail": "month and year are required."
+                },
+                status=400,
+            )
+
+        summary = SessionReport.objects.filter(
+            teacher_assignment__teacher=request.user,
+            session__session_date__month=month,
+            session__session_date__year=year,
+        ).aggregate(
+            approved=Count(
+                "id",
+                filter=Q(status="approved"),
+            ),
+            rejected=Count(
+                "id",
+                filter=Q(status="rejected"),
+            ),
+            pending=Count(
+                "id",
+                filter=Q(status="pending"),
+            ),
+        )
+
+        return Response(
+            {
+                "month": int(month),
+                "year": int(year),
+                **summary,
+            }
+        )
+
