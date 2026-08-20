@@ -35,6 +35,8 @@ class SessionReportReviewListView(generics.ListAPIView):
         school_id = self.request.query_params.get("school")
         class_id = self.request.query_params.get("classroom")
         teacher_id = self.request.query_params.get("teacher")
+        date_from = self.request.query_params.get("date_from")
+        date_to = self.request.query_params.get("date_to")
 
         if school_id:
             queryset = queryset.filter(
@@ -51,8 +53,18 @@ class SessionReportReviewListView(generics.ListAPIView):
                 teacher_assignment__teacher_id=teacher_id
             )
 
-        return queryset  
-    
+        if date_from:
+            queryset = queryset.filter(
+                session__session_date__date__gte=date_from
+            )
+
+        if date_to:
+            queryset = queryset.filter(
+                session__session_date__date__lte=date_to
+            )
+
+        return queryset
+        
 class SessionReportReviewUpdateView(generics.UpdateAPIView):
     queryset = SessionReport.objects.all()
     serializer_class = SessionReportReviewSerializer
