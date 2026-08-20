@@ -33,13 +33,19 @@ class SessionReportReviewListView(generics.ListAPIView):
         queryset = SessionReport.objects.all()
 
         school_id = self.request.query_params.get("school")
+        class_id = self.request.query_params.get("classroom")
 
         if school_id:
             queryset = queryset.filter(
                 session__classroom__school_id=school_id
             )
 
-        return queryset    
+        if class_id:
+            queryset = queryset.filter(
+                session__classroom_id=class_id
+            )
+
+        return queryset   
     
 class SessionReportReviewUpdateView(generics.UpdateAPIView):
     queryset = SessionReport.objects.all()
