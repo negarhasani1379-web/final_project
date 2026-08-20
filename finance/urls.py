@@ -6,6 +6,7 @@ from finance.views import (
     SessionReportReviewListView,
     SessionReportReviewUpdateView,
     SessionReportUpdateView,
+    TeacherMonthlyReportSummaryView,
 )
 
 urlpatterns = [
@@ -35,4 +36,10 @@ urlpatterns = [
         SessionReportUpdateView.as_view(),
         name="session-report-update",
     ),
-]
+   
+   path(
+    "session-reports/my-summary/",
+    TeacherMonthlyReportSummaryView.as_view(),
+    name="teacher-monthly-report-summary",
+    ),
+]    

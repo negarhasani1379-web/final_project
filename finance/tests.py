@@ -7,7 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
-from finance.models import SessionReport
+from finance.models import SessionReport, SessionReportStatus
 from finance.serializers import SessionReportSerializer
 from school.models import School
 
@@ -529,6 +529,63 @@ class SessionReportAPITests(APITestCase):
             self.assignment.id,
         )
         self.assertEqual(response.data["status"], "pending")
+
+    def test_teacher_can_get_monthly_report_summary(self):
+        current_month = self.session.session_date.month
+        current_year = self.session.session_date.year
+
+        SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Approved report",
+            present_count=15,
+            absent_count=2,
+            status=SessionReportStatus.APPROVED,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=self.session.session_date + timedelta(hours=1),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment,
+            lesson_summary="Rejected report",
+            present_count=14,
+            absent_count=3,
+            status=SessionReportStatus.REJECTED,
+        )
+
+        session_3 = Session.objects.create(
+            classroom=self.classroom,
+            session_number=3,
+            session_date=self.session.session_date + timedelta(hours=2),
+        )
+
+        SessionReport.objects.create(
+            session=session_3,
+            teacher_assignment=self.assignment,
+            lesson_summary="Pending report",
+            present_count=16,
+            absent_count=1,
+            status=SessionReportStatus.PENDING,
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.get(
+            f"/api/session-reports/my-summary/"
+            f"?month={current_month}&year={current_year}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["month"], current_month)
+        self.assertEqual(response.data["year"], current_year)
+        self.assertEqual(response.data["approved"], 1)
+        self.assertEqual(response.data["rejected"], 1)
+        self.assertEqual(response.data["pending"], 1)    
 
 
     def test_non_teacher_cannot_create_session_report(self):
