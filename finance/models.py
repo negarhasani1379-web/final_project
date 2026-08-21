@@ -73,6 +73,11 @@ class SessionReport(BaseModel):
         blank=True,
     )
 
+    resubmitted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     is_late = models.BooleanField(default=False)
 
 
