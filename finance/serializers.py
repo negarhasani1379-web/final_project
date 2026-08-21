@@ -17,11 +17,13 @@ class SessionReportSerializer(serializers.ModelSerializer):
             "absent_count",
             "status",
             "review_comment",
+            "resubmitted_at",
             "is_late",
         ]
         read_only_fields = [
             "status",
             "review_comment",
+            "resubmitted_at",
             "is_late",
         ]
 
@@ -64,6 +66,21 @@ class SessionReportSerializer(serializers.ModelSerializer):
 
         return attrs
     
+    def update(self, instance, validated_data):
+        if instance.status == "rejected":
+            resubmitted_at = timezone.now()
+
+            validated_data["resubmitted_at"] = resubmitted_at
+            validated_data["status"] = "pending"
+            validated_data["review_comment"] = ""
+
+            if instance.rejected_at:
+                validated_data["is_late"] = (
+                    resubmitted_at - instance.rejected_at
+                ).total_seconds() > 18 * 60 * 60
+
+        return super().update(instance, validated_data)
+    
     def create(self, validated_data):
         session = validated_data["session"]
 
@@ -88,6 +105,11 @@ class SessionReportReviewSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+    def update(self, instance, validated_data):
+        if validated_data.get("status") == "rejected":
+            validated_data["rejected_at"] = timezone.now()
+
+        return super().update(instance, validated_data)
     class Meta:
         model = SessionReport
         fields = [
@@ -99,6 +121,8 @@ class SessionReportReviewSerializer(serializers.ModelSerializer):
             "absent_count",
             "status",
             "review_comment",
+            "rejected_at",
+            "resubmitted_at",
             "is_late",
         ]
         read_only_fields = [
@@ -109,4 +133,6 @@ class SessionReportReviewSerializer(serializers.ModelSerializer):
             "present_count",
             "absent_count",
             "is_late",
+            "rejected_at",
+            "resubmitted_at",
         ]    
