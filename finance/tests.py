@@ -1128,6 +1128,8 @@ class SessionReportAPITests(APITestCase):
         )
 
         self.client.force_authenticate(user=self.teacher)
+        report.rejected_at = timezone.now()
+        report.save(update_fields=["rejected_at"])
 
         response = self.client.patch(
             f"/api/session-reports/{report.id}/",
@@ -1148,6 +1150,43 @@ class SessionReportAPITests(APITestCase):
         self.assertEqual(report.lesson_summary, "Corrected lesson.")
         self.assertEqual(report.present_count, 14)
         self.assertEqual(report.absent_count, 3) 
+        self.assertIsNotNone(report.resubmitted_at)
+        self.assertFalse(report.is_late)
+        self.assertEqual(report.review_comment, "")
+
+
+    def test_teacher_resubmit_is_late_after_18_hours(self):
+        report = SessionReport.objects.create(
+            session=self.session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Original lesson.",
+            present_count=15,
+            absent_count=2,
+            status="rejected",
+            review_comment="Please correct the lesson.",
+            rejected_at=timezone.now() - timedelta(hours=19),
+        )
+
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.patch(
+            f"/api/session-reports/{report.id}/",
+            {
+                "lesson_summary": "Late corrected lesson.",
+                "present_count": 14,
+                "absent_count": 3,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        report.refresh_from_db()
+
+        self.assertEqual(report.status, "pending")
+        self.assertIsNotNone(report.resubmitted_at)
+        self.assertTrue(report.is_late)
+        self.assertEqual(report.review_comment, "")    
 
 
     def test_teacher_cannot_edit_approved_session_report(self):
