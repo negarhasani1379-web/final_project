@@ -1,0 +1,45 @@
+from django.urls import path
+
+from finance.views import (
+    SessionReportCreateView,
+    SessionReportListView,
+    SessionReportReviewListView,
+    SessionReportReviewUpdateView,
+    SessionReportUpdateView,
+    TeacherMonthlyReportSummaryView,
+)
+
+urlpatterns = [
+    path(
+        "session-reports/",
+        SessionReportCreateView.as_view(),
+        name="session-report-create",
+    ),
+    path(
+        "session-reports/list/",
+        SessionReportListView.as_view(),
+        name="session-report-list",
+    ),
+    path(
+        "session-reports/review/",
+        SessionReportReviewListView.as_view(),
+        name="session-report-review-list",
+    ),
+
+    path(
+        "session-reports/<int:pk>/review/",
+        SessionReportReviewUpdateView.as_view(),
+        name="session-report-review-update",
+    ),
+    path(
+        "session-reports/<int:pk>/",
+        SessionReportUpdateView.as_view(),
+        name="session-report-update",
+    ),
+   
+   path(
+    "session-reports/my-summary/",
+    TeacherMonthlyReportSummaryView.as_view(),
+    name="teacher-monthly-report-summary",
+    ),
+]    

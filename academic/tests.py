@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from rest_framework import status
@@ -633,8 +635,293 @@ class ClassAPITest(APITestCase):
         self.assertEqual(
             len(response.data),
             0,
+        )
+    
+    def test_class_detail_returns_current_teacher_summary(self):
+        classroom = Class.objects.create(
+            title="Test Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=classroom,
+            start_date=date.today(),
+            end_date=None,
+        )
+
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            f"{self.url}{classroom.id}/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.data["current_teacher"],
+            {
+                "id": self.teacher.id,
+                "username": self.teacher.username,
+            },
+        )
+###########ClassFilterAPITest#########
+class ClassFilterAPITest(APITestCase):
+
+    def setUp(self):
+        self.education = User.objects.create_user(
+            username="education_filter_test",
+            password="Test12345",
+            role="education",
+        )
+
+        self.teacher = User.objects.create_user(
+            username="teacher_filter_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        self.other_teacher = User.objects.create_user(
+            username="other_teacher_filter_test",
+            password="Test12345",
+            role="teacher",
+        )
+
+        self.school = School.objects.create(
+            name="Test School",
+        )
+
+        self.other_school = School.objects.create(
+            name="Other School",
+        )
+
+        self.term = Term.objects.create(
+            title="Fall 2026",
+            start_date="2026-09-01",
+            end_date="2027-01-20",
+            term_type="normal",
+        )
+
+        self.other_term = Term.objects.create(
+            title="Summer 2026",
+            start_date="2026-06-01",
+            end_date="2026-08-31",
+            term_type="summer",
+        )
+
+        self.classroom = Class.objects.create(
+            title="English Literature",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.other_classroom = Class.objects.create(
+            title="Mathematics",
+            school=self.other_school,
+            term=self.other_term,
+            session_duration=60,
+        )
+
+        self.url = "/api/classes/"
+
+    def test_education_can_filter_classes_by_school(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            f"{self.url}?school={self.school.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
         ) 
 
+    def test_education_can_filter_classes_by_term(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            f"{self.url}?term={self.term.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        ) 
+
+    def test_education_can_filter_classes_by_teacher(self):
+        self.client.force_authenticate(user=self.education)
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            f"{self.url}?teacher={self.teacher.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )
+
+    def test_education_can_filter_classes_by_school_and_term(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(
+            f"{self.url}?school={self.school.id}&term={self.term.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )
+
+    def test_education_can_filter_classes_by_school_term_and_teacher(self):
+        self.client.force_authenticate(user=self.education)
+
+        TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        response = self.client.get(
+            f"{self.url}"
+            f"?school={self.school.id}"
+            f"&term={self.term.id}"
+            f"&teacher={self.teacher.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.classroom.id,
+        )
+
+    def test_deleted_teacher_assignment_is_not_used_for_teacher_filter(self):
+        self.client.force_authenticate(user=self.education)
+
+        assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date="2026-09-01",
+            end_date="2026-10-01",
+        )
+
+        assignment.delete()
+
+        response = self.client.get(
+            f"{self.url}?teacher={self.teacher.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            0,
+        )
+
+    def test_deleted_class_is_not_returned_in_filtered_list(self):
+        self.client.force_authenticate(user=self.education)
+
+        self.classroom.delete()
+
+        classroom = Class.objects.create(
+            title="Deleted Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        classroom.delete()
+
+        response = self.client.get(
+            f"{self.url}?school={self.school.id}"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            0,
+        ) 
+
+    def test_education_can_list_all_classes_without_filter(self):
+        self.client.force_authenticate(user=self.education)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )                            
 
 ##########TeacherAssignment########## 
 class TeacherAssignmentTest(APITestCase):
@@ -1078,7 +1365,7 @@ class TeacherAssignmentTest(APITestCase):
             self.classroom.id,
         )
 
-    def test_education_cannot_list_teacher_classes(self):
+    def test_education_can_list_classes(self):
         self.client.force_authenticate(user=self.education)
 
         response = self.client.get(
@@ -1087,7 +1374,7 @@ class TeacherAssignmentTest(APITestCase):
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_403_FORBIDDEN,
+            status.HTTP_200_OK,
         )
 
     def test_multiple_teachers_can_have_same_class_at_different_times(self):

@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models import Q
 
 from account.models import User, UserRole
-from core.models import BaseModel
+from core.models import BaseModel, SoftDeleteModel
 from school.models import School
 
 
@@ -14,7 +14,7 @@ class TermType(models.TextChoices):
     SUMMER = "summer", "Summer"
 
 
-class Term(BaseModel):
+class Term(SoftDeleteModel):
     title = models.CharField(max_length=100)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -29,6 +29,7 @@ class Term(BaseModel):
                 "End date cannot be before start date."
             )
 
+
         overlapping = Term.objects.filter(
             start_date__lte=self.end_date,
             end_date__gte=self.start_date,
@@ -41,10 +42,8 @@ class Term(BaseModel):
             raise ValidationError(
                 "This term overlaps with an existing term."
             )
-    def __str__(self):
-        return self.title
 
-class Class(BaseModel):
+class Class(SoftDeleteModel):
     title = models.CharField(max_length=100)
 
     school = models.ForeignKey(
@@ -68,7 +67,31 @@ class Class(BaseModel):
         ]
     )
 
-class TeacherAssignment(BaseModel):
+
+class Session(SoftDeleteModel):
+    classroom = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name="sessions",
+    )
+
+    session_number = models.PositiveIntegerField()
+
+    session_date = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["classroom", "session_number"],
+                name="unique_session_number_per_class",
+            ),
+            models.UniqueConstraint(
+                fields=["classroom", "session_date"],
+                name="unique_session_date_per_class",
+            ),
+]
+
+class TeacherAssignment(SoftDeleteModel):
     teacher = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
