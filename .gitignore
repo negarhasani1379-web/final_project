@@ -21,3 +21,5 @@ staticfiles/
 
 # Mac
 .DS_Store
+
+.coverage

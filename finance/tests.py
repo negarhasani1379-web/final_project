@@ -1155,7 +1155,7 @@ class SessionReportAPITests(APITestCase):
         self.assertEqual(report.review_comment, "")
 
 
-    def test_teacher_resubmit_is_late_after_18_hours(self):
+    def test_teacher_resubmit_is_late_after_48_hours(self):
         report = SessionReport.objects.create(
             session=self.session,
             teacher_assignment=self.assignment,
@@ -1164,7 +1164,7 @@ class SessionReportAPITests(APITestCase):
             absent_count=2,
             status="rejected",
             review_comment="Please correct the lesson.",
-            rejected_at=timezone.now() - timedelta(hours=19),
+            rejected_at=timezone.now() - timedelta(hours=49),
         )
 
         self.client.force_authenticate(user=self.teacher)
