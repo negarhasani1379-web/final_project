@@ -77,7 +77,7 @@ class SessionReportSerializer(serializers.ModelSerializer):
             if instance.rejected_at:
                 validated_data["is_late"] = (
                     resubmitted_at - instance.rejected_at
-                ).total_seconds() > 18 * 60 * 60
+                ).total_seconds() > 48 * 60 * 60
 
         return super().update(instance, validated_data)
     
