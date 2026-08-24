@@ -153,22 +153,22 @@ class TeacherMonthlySalaryCalculateView(generics.CreateAPIView):
     ]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(
-            data=request.data
-        )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        serializer.is_valid(
-            raise_exception=True
-        )
-
-        salary = calculate_teacher_monthly_salary(
-            teacher=serializer.validated_data["teacher"],
-            year=serializer.validated_data["year"],
-            month=serializer.validated_data["month"],
-        )
+        try:
+            salary = calculate_teacher_monthly_salary(
+                teacher=serializer.validated_data["teacher"],
+                year=serializer.validated_data["year"],
+                month=serializer.validated_data["month"],
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=400,
+            )
 
         return Response(
             SalarySerializer(salary).data,
             status=200,
-        )    
-
+        )
