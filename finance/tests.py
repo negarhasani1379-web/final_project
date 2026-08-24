@@ -2055,4 +2055,61 @@ class SalaryCalculationServiceTests(TestCase):
         self.assertEqual(
             amount,
             Decimal("200000.00"),
-        )                 
+        ) 
+
+    def test_summer_term_applies_ten_percent_bonus(self):
+        summer_term = Term.objects.create(
+            title="Summer 2026",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 8, 31),
+            term_type="summer",
+        )
+
+        summer_class = Class.objects.create(
+            title="Summer Class",
+            school=self.school,
+            term=summer_term,
+            session_duration=90,
+        )
+
+        summer_assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=summer_class,
+            start_date=summer_term.start_date,
+            end_date=summer_term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=summer_term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session = Session.objects.create(
+            classroom=summer_class,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 8, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=summer_assignment,
+            lesson_summary="Summer session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=8,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("220000.00"),
+        )                    
