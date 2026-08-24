@@ -2428,4 +2428,15 @@ class SalaryCalculationServiceTests(TestCase):
                 teacher=self.teacher,
                 year=2026,
                 month=13,
-            )                                            
+            ) 
+
+    def test_salary_calculation_rejects_zero_month(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "Month must be between 1 and 12.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=0,
+            )                                                   
