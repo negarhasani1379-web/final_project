@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -24,9 +24,32 @@ class Term(SoftDeleteModel):
     )
     
     def clean(self):
+        super().clean()
+
         if self.end_date < self.start_date:
             raise ValidationError(
                 "End date cannot be before start date."
+            )
+
+        if self.start_date.day != 1:
+            raise ValidationError(
+                "Term must start on the first day of a month."
+            )
+
+        next_month = self.start_date.month % 12 + 1
+        next_month_year = self.start_date.year + (
+            1 if self.start_date.month == 12 else 0
+        )
+
+        expected_end_date = date(
+            next_month_year,
+            next_month,
+            1,
+        ) - timedelta(days=1)
+
+        if self.end_date != expected_end_date:
+            raise ValidationError(
+                "Term must end on the last day of the same month."
             )
 
         overlapping = Term.objects.filter(
