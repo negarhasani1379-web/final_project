@@ -2970,4 +2970,20 @@ class TeacherMonthlySalaryViewTests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_403_FORBIDDEN,
-        )          
+        )
+
+    def test_unauthenticated_user_cannot_calculate_teacher_monthly_salary(self):
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )              
