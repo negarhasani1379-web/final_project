@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.db.models import Q
 from rest_framework import serializers
@@ -30,10 +30,40 @@ class TermSerializer(serializers.ModelSerializer):
             self.instance.end_date if self.instance else None,
         )
 
-        if start_date and end_date and end_date < start_date:
-            raise serializers.ValidationError(
-                "End date cannot be before start date."
+        if start_date and end_date:
+            if end_date < start_date:
+                raise serializers.ValidationError(
+                    "End date cannot be before start date."
+                )
+
+            if start_date.day != 1:
+                raise serializers.ValidationError(
+                    {
+                        "start_date": (
+                            "Term must start on the first day of a month."
+                        )
+                    }
+                )
+
+            next_month = start_date.month % 12 + 1
+            next_month_year = start_date.year + (
+                1 if start_date.month == 12 else 0
             )
+
+            expected_end_date = date(
+                next_month_year,
+                next_month,
+                1,
+            ) - timedelta(days=1)
+
+            if end_date != expected_end_date:
+                raise serializers.ValidationError(
+                    {
+                        "end_date": (
+                            "Term must end on the last day of the same month."
+                        )
+                    }
+                )
 
         overlapping = Term.objects.filter(
             start_date__lte=end_date,
@@ -41,7 +71,9 @@ class TermSerializer(serializers.ModelSerializer):
         )
 
         if self.instance:
-            overlapping = overlapping.exclude(pk=self.instance.pk)
+            overlapping = overlapping.exclude(
+                pk=self.instance.pk
+            )
 
         if overlapping.exists():
             raise serializers.ValidationError(
@@ -49,7 +81,6 @@ class TermSerializer(serializers.ModelSerializer):
             )
 
         return attrs
-
 class CurrentTeacherSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
