@@ -3212,4 +3212,32 @@ class TeacherMonthlySalaryViewTests(APITestCase):
         self.assertEqual(
             response.data["calculated_amount"],
             "200000.00",
-        )        
+        ) 
+
+    def test_calculate_salary_fails_without_teacher_term_rate(self):
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher,
+            term=self.term,
+        ).delete()
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "No teacher term rate exists for this teacher and term.",
+        )           
