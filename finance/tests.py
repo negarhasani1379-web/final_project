@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
-from finance.models import SessionReport, SessionReportStatus, TeacherTermRate
+from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTermRate
 from finance.serializers import SessionReportSerializer, TeacherTermRateSerializer
 from school.models import School
 
@@ -1679,3 +1679,126 @@ class TeacherTermRateAPITests(APITestCase):
             response.status_code,
             status.HTTP_400_BAD_REQUEST,
         )                   
+
+
+class SalaryModelTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="salary_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.other_teacher = User.objects.create_user(
+            username="salary_other_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary Test School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary Test Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+    def test_salary_can_be_created(self):
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2540000.00"),
+            final_amount=Decimal("2540000.00"),
+        )
+
+        self.assertEqual(salary.teacher, self.teacher)
+        self.assertEqual(salary.term, self.term)
+        self.assertEqual(salary.year, 2026)
+        self.assertEqual(salary.month, 9)
+
+    def test_salary_amounts_are_decimal(self):
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2540000.00"),
+            final_amount=Decimal("2540000.00"),
+        )
+
+        self.assertEqual(
+            salary.calculated_amount,
+            Decimal("2540000.00"),
+        )
+        self.assertEqual(
+            salary.final_amount,
+            Decimal("2540000.00"),
+        )
+
+    def test_salary_is_unique_per_teacher_year_and_month(self):
+        Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        with self.assertRaises(Exception):
+            Salary.objects.create(
+                teacher=self.teacher,
+                term=self.term,
+                year=2026,
+                month=9,
+                calculated_amount=Decimal("2500000.00"),
+                final_amount=Decimal("2500000.00"),
+            )
+
+    def test_different_teacher_can_have_salary_for_same_month(self):
+        Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        salary = Salary.objects.create(
+            teacher=self.other_teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2200000.00"),
+            final_amount=Decimal("2200000.00"),
+        )
+
+        self.assertEqual(salary.teacher, self.other_teacher)
+
+    def test_same_teacher_can_have_salary_for_different_month(self):
+        Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=10,
+            calculated_amount=Decimal("2200000.00"),
+            final_amount=Decimal("2200000.00"),
+        )
+
+        self.assertEqual(salary.month, 10)        
