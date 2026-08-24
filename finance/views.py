@@ -13,6 +13,12 @@ from finance.serializers import (
 )
 
 
+class TeacherTermRateListCreateView(generics.ListCreateAPIView):
+    queryset = TeacherTermRate.objects.all()
+    serializer_class = TeacherTermRateSerializer
+    permission_classes = [IsAuthenticated, IsFinance]
+
+
 class SessionReportCreateView(generics.CreateAPIView):
     serializer_class = SessionReportSerializer
     permission_classes = [IsAuthenticated, IsTeacher]
@@ -131,8 +137,4 @@ class TeacherMonthlyReportSummaryView(APIView):
                 **summary,
             }
         )   
-    class TeacherTermRateListCreateView(generics.ListCreateAPIView):
-        queryset = TeacherTermRate.objects.all()
-        serializer_class = TeacherTermRateSerializer
-        permission_classes = [IsAuthenticated, IsFinance]
-
+   
