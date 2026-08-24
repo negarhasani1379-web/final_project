@@ -3173,4 +3173,43 @@ class TeacherMonthlySalaryViewTests(APITestCase):
         self.assertEqual(
             response.data["detail"],
             "Salary cannot be calculated until all reports for the month are approved.",
-        )    
+        )
+
+    def test_calculate_salary_excludes_late_approved_report(self):
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.classroom,
+                session_number=2,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 15, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment,
+            lesson_summary="Late approved report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["calculated_amount"],
+            "200000.00",
+        )        
