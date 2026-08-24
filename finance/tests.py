@@ -3030,4 +3030,26 @@ class TeacherMonthlySalaryViewTests(APITestCase):
         self.assertIn(
             "year",
             response.data,
-        )                      
+        ) 
+
+    def test_calculate_salary_requires_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )                         
