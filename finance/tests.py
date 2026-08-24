@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
@@ -7,8 +8,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
-from finance.models import SessionReport, SessionReportStatus
-from finance.serializers import SessionReportSerializer
+from finance.models import SessionReport, SessionReportStatus, TeacherTermRate
+from finance.serializers import SessionReportSerializer, TeacherTermRateSerializer
 from school.models import School
 
 
@@ -1476,4 +1477,43 @@ class SessionReportAPITests(APITestCase):
             "/api/session-reports/review/"
         )
 
-        self.assertEqual(response.status_code, 403)    
+        self.assertEqual(response.status_code, 403) 
+
+
+
+class TeacherTermRateSerializerTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="rate_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.term = Term.objects.create(
+            title="Rate Test Term",
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=90),
+            term_type="normal",
+        )
+
+    def test_teacher_term_rate_serializer_valid(self):
+        data = {
+            "teacher": self.teacher.id,
+            "term": self.term.id,
+            "base_rate": "500000.00",
+        }
+
+        serializer = TeacherTermRateSerializer(data=data)
+
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        rate = serializer.save()
+
+        self.assertEqual(rate.teacher, self.teacher)
+        self.assertEqual(rate.term, self.term)
+        self.assertEqual(rate.base_rate, Decimal("500000.00"))
+        self.assertFalse(rate.is_deleted)
