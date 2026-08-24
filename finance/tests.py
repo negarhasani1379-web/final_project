@@ -2528,4 +2528,39 @@ class SalaryCalculationServiceTests(TestCase):
         self.assertEqual(
             amount,
             Decimal("0.00"),
-        )                                                                     
+        )
+
+    def test_salary_calculation_fails_when_teacher_term_rate_is_deleted(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=33,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 18, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Report with deleted rate",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        rate = TeacherTermRate.objects.get(
+            teacher=self.teacher,
+            term=self.term,
+        )
+        rate.delete()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher term rate exists for this teacher and term.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )                                                                         
