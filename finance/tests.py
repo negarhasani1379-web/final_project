@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
-from academic.models import Class, Session, TeacherAssignment, Term
+from academic.models import Class, Session, TeacherAssignment, Term, TermType
 from account.models import User, UserRole
 from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTermRate
 from finance.serializers import (
@@ -2813,4 +2813,119 @@ class SalarySerializerTests(TestCase):
 
         self.assertTrue(
             serializer.fields["final_amount"].read_only
-        )                       
+        ) 
+
+
+class TeacherMonthlySalaryViewTests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="salary_view_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher = User.objects.create_user(
+            username="salary_view_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary View School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary View Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        self.classroom = Class.objects.create(
+            title="Salary View Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Salary view test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        self.url = "/api/teacher-monthly-salary/calculate/"
+
+
+    def test_finance_can_calculate_teacher_monthly_salary(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["teacher"],
+            self.teacher.id,
+        )
+
+        self.assertEqual(
+            response.data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            response.data["month"],
+            9,
+        )
+
+        self.assertEqual(
+            response.data["calculated_amount"],
+            "200000.00",
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        )    
