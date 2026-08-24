@@ -3240,4 +3240,76 @@ class TeacherMonthlySalaryViewTests(APITestCase):
         self.assertEqual(
             response.data["detail"],
             "No teacher term rate exists for this teacher and term.",
-        )           
+        ) 
+
+    def test_recalculate_salary_updates_existing_salary(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        first_response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            first_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        first_salary_id = first_response.data["id"]
+
+        second_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Second approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            second_response.data["id"],
+            first_salary_id,
+        )
+
+        self.assertEqual(
+            second_response.data["calculated_amount"],
+            "400000.00",
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        )              
