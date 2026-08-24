@@ -2352,4 +2352,69 @@ class SalaryCalculationServiceTests(TestCase):
                 month=9,
             ).count(),
             1,
-        )                                     
+        )
+
+    def test_recalculation_fails_when_new_report_is_unapproved(self):
+        first_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=27,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 26, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=first_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Approved report before recalculation",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        first_salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            first_salary.calculated_amount,
+            Decimal("200000.00"),
+        )
+
+        new_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=28,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 27, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=new_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="New pending report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Salary cannot be calculated until all reports for the month are approved.",
+        ):
+            calculate_teacher_monthly_salary(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )
+
+        first_salary.refresh_from_db()
+
+        self.assertEqual(
+            first_salary.calculated_amount,
+            Decimal("200000.00"),
+        )                                         
