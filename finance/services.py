@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from finance.models import (
+    Salary,
     SessionReport,
     SessionReportStatus,
     TeacherTermRate,
@@ -102,3 +103,47 @@ def calculate_teacher_monthly_salary_amount(
         wage = wage * Decimal("1.1")
 
     return wage
+
+
+def calculate_teacher_monthly_salary(
+    teacher,
+    year,
+    month,
+):
+    wage = calculate_teacher_monthly_salary_amount(
+        teacher=teacher,
+        year=year,
+        month=month,
+    )
+
+    term = (
+        SessionReport.objects
+        .filter(
+            teacher_assignment__teacher=teacher,
+            session__session_date__year=year,
+            session__session_date__month=month,
+            status=SessionReportStatus.APPROVED,
+        )
+        .select_related("session__classroom__term")
+        .first()
+        .session
+        .classroom
+        .term
+    )
+
+    salary, _ = Salary.objects.update_or_create(
+        teacher=teacher,
+        year=year,
+        month=month,
+        defaults={
+            "term": term,
+            "calculated_amount": wage,
+            "final_amount": wage,
+            "adjustment_reason": "",
+        },
+    )
+
+    return salary
+
+
+    
