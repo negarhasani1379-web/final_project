@@ -2765,4 +2765,25 @@ class SalarySerializerTests(TestCase):
 
         self.assertFalse(serializer.is_valid())
 
-        self.assertIn("month", serializer.errors)            
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_serializer_rejects_non_teacher(self):
+        finance_user = User.objects.create_user(
+            username="serializer_finance_user",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        data = {
+            "teacher": finance_user.id,
+            "year": 2026,
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("teacher", serializer.errors)                
