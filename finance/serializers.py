@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from account.models import User, UserRole
 from finance.models import Salary, SessionReport, TeacherTermRate
 
 
@@ -175,3 +176,18 @@ class SalarySerializer(serializers.ModelSerializer):
             "final_amount",
             "adjustment_reason",
         ]
+
+class TeacherMonthlySalaryCalculateSerializer(serializers.Serializer):
+
+    teacher = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(
+            role=UserRole.TEACHER
+        )
+    )
+
+    year = serializers.IntegerField()
+
+    month = serializers.IntegerField(
+        min_value=1,
+        max_value=12,
+    )
