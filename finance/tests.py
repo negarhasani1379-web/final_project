@@ -12,6 +12,7 @@ from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTe
 from finance.serializers import (
     SalarySerializer,
     SessionReportSerializer,
+    TeacherMonthlySalaryCalculateSerializer,
     TeacherTermRateSerializer,
 )
 from finance.services import (
@@ -2704,3 +2705,34 @@ class SalarySerializerTests(TestCase):
             serializer.data["adjustment_reason"],
             "",
         )
+
+    def test_teacher_monthly_salary_serializer_accepts_valid_data(self):
+        data = {
+            "teacher": self.teacher.id,
+            "year": 2026,
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["teacher"],
+            self.teacher,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["month"],
+            9,
+        )    
