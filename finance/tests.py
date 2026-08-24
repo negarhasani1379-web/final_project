@@ -2563,4 +2563,65 @@ class SalaryCalculationServiceTests(TestCase):
                 teacher=self.teacher,
                 year=2026,
                 month=9,
-            )                                                                         
+            )
+                                                                                    
+    def test_other_teacher_reports_are_excluded(self):
+        other_teacher = User.objects.create_user(
+            username="other_salary_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        other_assignment = TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=self.class_90,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        other_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=34,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=other_session,
+            teacher_assignment=other_assignment,
+            lesson_summary="Other teacher report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        own_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=35,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 21, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=own_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Own teacher report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("200000.00"),
+        )
