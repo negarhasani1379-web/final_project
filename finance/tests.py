@@ -10,7 +10,10 @@ from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
 from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTermRate
 from finance.serializers import SessionReportSerializer, TeacherTermRateSerializer
-from finance.services import calculate_teacher_monthly_salary_amount
+from finance.services import (
+    calculate_teacher_monthly_salary,
+    calculate_teacher_monthly_salary_amount,
+)
 from school.models import School
 
 
@@ -2236,4 +2239,46 @@ class SalaryCalculationServiceTests(TestCase):
         self.assertEqual(
             amount,
             Decimal("2540000.00"),
-        )                               
+        ) 
+
+    def test_calculate_teacher_monthly_salary_creates_salary_record(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=24,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 25, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Salary record test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertIsNotNone(salary.id)
+        self.assertEqual(salary.teacher, self.teacher)
+        self.assertEqual(salary.term, self.term)
+        self.assertEqual(salary.year, 2026)
+        self.assertEqual(salary.month, 9)
+        self.assertEqual(
+            salary.calculated_amount,
+            Decimal("200000.00"),
+        )
+        self.assertEqual(
+            salary.final_amount,
+            Decimal("200000.00"),
+        )
+        self.assertEqual(salary.adjustment_reason, "") 
+        
+                                         
