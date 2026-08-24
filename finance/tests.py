@@ -1930,4 +1930,34 @@ class SalaryCalculationServiceTests(TestCase):
         self.assertEqual(
             amount,
             Decimal("600000.00"),
-        )    
+        ) 
+
+    def test_late_approved_report_is_excluded_from_salary(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Late approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("0.00"),
+        )       
