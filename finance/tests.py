@@ -2928,4 +2928,22 @@ class TeacherMonthlySalaryViewTests(APITestCase):
                 month=9,
             ).count(),
             1,
-        )    
+        ) 
+
+    def test_teacher_cannot_calculate_teacher_monthly_salary(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )       
