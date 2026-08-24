@@ -2439,4 +2439,15 @@ class SalaryCalculationServiceTests(TestCase):
                 teacher=self.teacher,
                 year=2026,
                 month=0,
-            )                                                   
+            )
+
+    def test_salary_calculation_fails_when_no_reports_exist(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "No session reports found for this teacher in this month.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )                                                           
