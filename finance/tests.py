@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -1517,3 +1518,164 @@ class TeacherTermRateSerializerTests(TestCase):
         self.assertEqual(rate.term, self.term)
         self.assertEqual(rate.base_rate, Decimal("500000.00"))
         self.assertFalse(rate.is_deleted)
+
+class TeacherTermRateAPITests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="finance_rate_test",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher = User.objects.create_user(
+            username="rate_api_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.education_user = User.objects.create_user(
+            username="rate_api_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.term = Term.objects.create(
+            title="Rate API Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+        self.url = "/api/teacher-term-rates/"
+
+    def test_finance_can_create_teacher_term_rate(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "term": self.term.id,
+                "base_rate": "500000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        self.assertEqual(
+            response.data["teacher"],
+            self.teacher.id,
+        )
+
+        self.assertEqual(
+            response.data["term"],
+            self.term.id,
+        )
+
+        self.assertEqual(
+            response.data["base_rate"],
+            "500000.00",
+        ) 
+
+    def test_finance_can_list_teacher_term_rates(self):
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            base_rate=Decimal("500000.00"),
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(len(response.data), 1)
+
+        self.assertEqual(
+            response.data[0]["teacher"],
+            self.teacher.id,
+        ) 
+
+    def test_teacher_cannot_create_teacher_term_rate(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "term": self.term.id,
+                "base_rate": "500000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_education_cannot_create_teacher_term_rate(self):
+        self.client.force_authenticate(user=self.education_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "term": self.term.id,
+                "base_rate": "500000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        ) 
+    def test_unauthenticated_user_cannot_create_teacher_term_rate(self):
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "term": self.term.id,
+                "base_rate": "500000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        ) 
+
+    def test_teacher_term_rate_cannot_be_duplicated(self):
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            base_rate=Decimal("500000.00"),
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "term": self.term.id,
+                "base_rate": "600000.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )                   
