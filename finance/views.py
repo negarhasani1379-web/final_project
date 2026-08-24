@@ -4,12 +4,19 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from account.permissions import IsEducation, IsTeacher
-from finance.models import SessionReport
+from account.permissions import IsEducation, IsFinance, IsTeacher
+from finance.models import SessionReport, TeacherTermRate
 from finance.serializers import (
     SessionReportReviewSerializer,
     SessionReportSerializer,
+    TeacherTermRateSerializer,
 )
+
+
+class TeacherTermRateListCreateView(generics.ListCreateAPIView):
+    queryset = TeacherTermRate.objects.all()
+    serializer_class = TeacherTermRateSerializer
+    permission_classes = [IsAuthenticated, IsFinance]
 
 
 class SessionReportCreateView(generics.CreateAPIView):
@@ -129,5 +136,5 @@ class TeacherMonthlyReportSummaryView(APIView):
                 "year": int(year),
                 **summary,
             }
-        )
-
+        )   
+   

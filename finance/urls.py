@@ -7,6 +7,7 @@ from finance.views import (
     SessionReportReviewUpdateView,
     SessionReportUpdateView,
     TeacherMonthlyReportSummaryView,
+    TeacherTermRateListCreateView,
 )
 
 urlpatterns = [
@@ -38,8 +39,17 @@ urlpatterns = [
     ),
    
    path(
-    "session-reports/my-summary/",
-    TeacherMonthlyReportSummaryView.as_view(),
-    name="teacher-monthly-report-summary",
-    ),
-]    
+        "session-reports/my-summary/",
+        TeacherMonthlyReportSummaryView.as_view(),
+        name="teacher-monthly-report-summary",
+        ),
+
+    path(
+        "teacher-term-rates/",
+        TeacherTermRateListCreateView.as_view(),
+        name="teacher-term-rate-list-create",
+    ),    
+
+
+] 
+
