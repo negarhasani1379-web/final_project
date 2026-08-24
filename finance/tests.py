@@ -1,16 +1,16 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
 from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTermRate
 from finance.serializers import SessionReportSerializer, TeacherTermRateSerializer
+from finance.services import calculate_teacher_monthly_salary_amount
 from school.models import School
 
 
@@ -1801,4 +1801,133 @@ class SalaryModelTests(TestCase):
             final_amount=Decimal("2200000.00"),
         )
 
-        self.assertEqual(salary.month, 10)        
+        self.assertEqual(salary.month, 10)
+
+class SalaryCalculationServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="salary_service_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary Service School",
+        )
+
+        self.term = Term.objects.create(
+            title="September 2026",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+        self.class_60 = Class.objects.create(
+            title="60 Minute Class",
+            school=self.school,
+            term=self.term,
+            session_duration=60,
+        )
+
+        self.class_90 = Class.objects.create(
+            title="90 Minute Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.class_120 = Class.objects.create(
+            title="120 Minute Class",
+            school=self.school,
+            term=self.term,
+            session_duration=120,
+        )
+
+        self.assignment_60 = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.class_60,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_90 = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.class_90,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_120 = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.class_120,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+
+    def test_calculates_salary_from_approved_non_late_reports(self):
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.class_90,
+                session_number=1,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 5, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment_90,
+            lesson_summary="90 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.class_60,
+                session_number=1,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 10, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment_60,
+            lesson_summary="60 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.class_120,
+                session_number=1,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 15, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment_120,
+            lesson_summary="120 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("600000.00"),
+        )    
