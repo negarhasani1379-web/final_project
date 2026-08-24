@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from finance.models import SessionReport, TeacherTermRate
+from finance.models import Salary, SessionReport, TeacherTermRate
 
 
 class SessionReportSerializer(serializers.ModelSerializer):
@@ -149,4 +149,29 @@ class TeacherTermRateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-        ]        
+        ]
+
+class SalarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Salary
+        fields = [
+            "id",
+            "teacher",
+            "term",
+            "year",
+            "month",
+            "calculated_amount",
+            "final_amount",
+            "adjustment_reason",
+        ]
+        read_only_fields = [
+            "id",
+            "teacher",
+            "term",
+            "year",
+            "month",
+            "calculated_amount",
+            "final_amount",
+            "adjustment_reason",
+        ]
