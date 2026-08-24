@@ -1,16 +1,24 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
-from rest_framework_simplejwt.tokens import RefreshToken
 
-from academic.models import Class, Session, TeacherAssignment, Term
+from academic.models import Class, Session, TeacherAssignment, Term, TermType
 from account.models import User, UserRole
-from finance.models import SessionReport, SessionReportStatus, TeacherTermRate
-from finance.serializers import SessionReportSerializer, TeacherTermRateSerializer
+from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTermRate
+from finance.serializers import (
+    SalarySerializer,
+    SessionReportSerializer,
+    TeacherMonthlySalaryCalculateSerializer,
+    TeacherTermRateSerializer,
+)
+from finance.services import (
+    calculate_teacher_monthly_salary,
+    calculate_teacher_monthly_salary_amount,
+)
 from school.models import School
 
 
@@ -1679,3 +1687,1629 @@ class TeacherTermRateAPITests(APITestCase):
             response.status_code,
             status.HTTP_400_BAD_REQUEST,
         )                   
+
+
+class SalaryModelTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="salary_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.other_teacher = User.objects.create_user(
+            username="salary_other_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary Test School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary Test Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+    def test_salary_can_be_created(self):
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2540000.00"),
+            final_amount=Decimal("2540000.00"),
+        )
+
+        self.assertEqual(salary.teacher, self.teacher)
+        self.assertEqual(salary.term, self.term)
+        self.assertEqual(salary.year, 2026)
+        self.assertEqual(salary.month, 9)
+
+    def test_salary_amounts_are_decimal(self):
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2540000.00"),
+            final_amount=Decimal("2540000.00"),
+        )
+
+        self.assertEqual(
+            salary.calculated_amount,
+            Decimal("2540000.00"),
+        )
+        self.assertEqual(
+            salary.final_amount,
+            Decimal("2540000.00"),
+        )
+
+    def test_salary_is_unique_per_teacher_year_and_month(self):
+        Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        with self.assertRaises(Exception):
+            Salary.objects.create(
+                teacher=self.teacher,
+                term=self.term,
+                year=2026,
+                month=9,
+                calculated_amount=Decimal("2500000.00"),
+                final_amount=Decimal("2500000.00"),
+            )
+
+    def test_different_teacher_can_have_salary_for_same_month(self):
+        Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        salary = Salary.objects.create(
+            teacher=self.other_teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2200000.00"),
+            final_amount=Decimal("2200000.00"),
+        )
+
+        self.assertEqual(salary.teacher, self.other_teacher)
+
+    def test_same_teacher_can_have_salary_for_different_month(self):
+        Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=10,
+            calculated_amount=Decimal("2200000.00"),
+            final_amount=Decimal("2200000.00"),
+        )
+
+        self.assertEqual(salary.month, 10)
+
+class SalaryCalculationServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="salary_service_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary Service School",
+        )
+
+        self.term = Term.objects.create(
+            title="September 2026",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+        self.class_60 = Class.objects.create(
+            title="60 Minute Class",
+            school=self.school,
+            term=self.term,
+            session_duration=60,
+        )
+
+        self.class_90 = Class.objects.create(
+            title="90 Minute Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.class_120 = Class.objects.create(
+            title="120 Minute Class",
+            school=self.school,
+            term=self.term,
+            session_duration=120,
+        )
+
+        self.assignment_60 = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.class_60,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_90 = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.class_90,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_120 = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.class_120,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+
+    def test_calculates_salary_from_approved_non_late_reports(self):
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.class_90,
+                session_number=1,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 5, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment_90,
+            lesson_summary="90 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.class_60,
+                session_number=1,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 10, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment_60,
+            lesson_summary="60 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.class_120,
+                session_number=1,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 15, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment_120,
+            lesson_summary="120 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("600000.00"),
+        ) 
+
+    def test_late_approved_report_is_excluded_from_salary(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Late approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("0.00"),
+        ) 
+
+    def test_salary_calculation_fails_when_month_has_unapproved_report(self):
+        approved_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=3,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 5, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=approved_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        pending_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=4,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=pending_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Pending session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Salary cannot be calculated until all reports for the month are approved.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ) 
+
+    def test_reports_from_other_month_are_excluded(self):
+        september_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=7,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=september_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="September session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        october_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=8,
+            session_date=timezone.make_aware(
+                datetime(2026, 10, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=october_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="October session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("200000.00"),
+        ) 
+
+    def test_summer_term_applies_ten_percent_bonus(self):
+        summer_term = Term.objects.create(
+            title="Summer 2026",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 8, 31),
+            term_type="summer",
+        )
+
+        summer_class = Class.objects.create(
+            title="Summer Class",
+            school=self.school,
+            term=summer_term,
+            session_duration=90,
+        )
+
+        summer_assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=summer_class,
+            start_date=summer_term.start_date,
+            end_date=summer_term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=summer_term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session = Session.objects.create(
+            classroom=summer_class,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 8, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=summer_assignment,
+            lesson_summary="Summer session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=8,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("220000.00"),
+        ) 
+
+    def test_salary_calculation_fails_without_teacher_term_rate(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=9,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Session without rate",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher,
+            term=self.term,
+        ).delete()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher term rate exists for this teacher and term.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )
+
+    def test_salary_calculation_matches_document_example(self):
+        # 10 sessions of 90 minutes
+        for session_number in range(10, 20):
+            session = Session.objects.create(
+                classroom=self.class_90,
+                session_number=session_number,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, session_number - 9, 10, 0),
+                ),
+            )
+
+            SessionReport.objects.create(
+                session=session,
+                teacher_assignment=self.assignment_90,
+                lesson_summary="90 minute session",
+                present_count=10,
+                absent_count=0,
+                status=SessionReportStatus.APPROVED,
+                is_late=False,
+            )
+
+        # 2 sessions of 60 minutes
+        for session_number in range(20, 22):
+            session = Session.objects.create(
+                classroom=self.class_60,
+                session_number=session_number,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, session_number - 17, 10, 0),
+                ),
+            )
+
+            SessionReport.objects.create(
+                session=session,
+                teacher_assignment=self.assignment_60,
+                lesson_summary="60 minute session",
+                present_count=10,
+                absent_count=0,
+                status=SessionReportStatus.APPROVED,
+                is_late=False,
+            )
+
+        # 1 session of 120 minutes
+        session_120 = Session.objects.create(
+            classroom=self.class_120,
+            session_number=22,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 23, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_120,
+            teacher_assignment=self.assignment_120,
+            lesson_summary="120 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        # 1 approved but late session → excluded
+        late_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=23,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 24, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=late_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Late session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("2540000.00"),
+        ) 
+
+    def test_calculate_teacher_monthly_salary_creates_salary_record(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=24,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 25, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Salary record test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertIsNotNone(salary.id)
+        self.assertEqual(salary.teacher, self.teacher)
+        self.assertEqual(salary.term, self.term)
+        self.assertEqual(salary.year, 2026)
+        self.assertEqual(salary.month, 9)
+        self.assertEqual(
+            salary.calculated_amount,
+            Decimal("200000.00"),
+        )
+        self.assertEqual(
+            salary.final_amount,
+            Decimal("200000.00"),
+        )
+        self.assertEqual(salary.adjustment_reason, "") 
+
+    def test_recalculating_same_month_updates_existing_salary(self):
+        first_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=25,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 26, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=first_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="First salary calculation",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        first_salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            first_salary.calculated_amount,
+            Decimal("200000.00"),
+        )
+
+        second_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=26,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 27, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Second salary calculation",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            second_salary.id,
+            first_salary.id,
+        )
+
+        self.assertEqual(
+            second_salary.calculated_amount,
+            Decimal("400000.00"),
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        )
+
+    def test_recalculation_fails_when_new_report_is_unapproved(self):
+        first_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=27,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 26, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=first_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Approved report before recalculation",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        first_salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            first_salary.calculated_amount,
+            Decimal("200000.00"),
+        )
+
+        new_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=28,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 27, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=new_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="New pending report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Salary cannot be calculated until all reports for the month are approved.",
+        ):
+            calculate_teacher_monthly_salary(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )
+
+        first_salary.refresh_from_db()
+
+        self.assertEqual(
+            first_salary.calculated_amount,
+            Decimal("200000.00"),
+        ) 
+
+    def test_salary_calculation_rejects_invalid_month(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "Month must be between 1 and 12.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=13,
+            ) 
+
+    def test_salary_calculation_rejects_zero_month(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "Month must be between 1 and 12.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=0,
+            )
+
+    def test_salary_calculation_fails_when_no_reports_exist(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "No session reports found for this teacher in this month.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ) 
+
+    def test_reports_from_other_year_are_excluded(self):
+        current_year_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=30,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=current_year_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Current year session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        previous_year_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=31,
+            session_date=timezone.make_aware(
+                datetime(2025, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=previous_year_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Previous year session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("200000.00"),
+        ) 
+
+    def test_all_late_approved_reports_result_in_zero_salary(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=32,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Late approved report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("0.00"),
+        )
+
+    def test_salary_calculation_fails_when_teacher_term_rate_is_deleted(self):
+        session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=33,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 18, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Report with deleted rate",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        rate = TeacherTermRate.objects.get(
+            teacher=self.teacher,
+            term=self.term,
+        )
+        rate.delete()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher term rate exists for this teacher and term.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )
+                                                                                    
+    def test_other_teacher_reports_are_excluded(self):
+        other_teacher = User.objects.create_user(
+            username="other_salary_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        other_assignment = TeacherAssignment.objects.create(
+            teacher=other_teacher,
+            classroom=self.class_90,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        other_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=34,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=other_session,
+            teacher_assignment=other_assignment,
+            lesson_summary="Other teacher report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        own_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=35,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 21, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=own_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Own teacher report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("200000.00"),
+        )
+
+
+
+class SalarySerializerTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="salary_serializer_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary Serializer School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary Serializer Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+    def test_salary_serializer_returns_salary_data(self):
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("200000.00"),
+            final_amount=Decimal("200000.00"),
+            adjustment_reason="",
+        )
+
+        serializer = SalarySerializer(salary)
+
+        self.assertEqual(
+            serializer.data["id"],
+            salary.id,
+        )
+
+        self.assertEqual(
+            serializer.data["teacher"],
+            self.teacher.id,
+        )
+
+        self.assertEqual(
+            serializer.data["term"],
+            self.term.id,
+        )
+
+        self.assertEqual(
+            serializer.data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.data["month"],
+            9,
+        )
+
+        self.assertEqual(
+            serializer.data["calculated_amount"],
+            "200000.00",
+        )
+
+        self.assertEqual(
+            serializer.data["final_amount"],
+            "200000.00",
+        )
+
+        self.assertEqual(
+            serializer.data["adjustment_reason"],
+            "",
+        )
+
+    def test_teacher_monthly_salary_serializer_accepts_valid_data(self):
+        data = {
+            "teacher": self.teacher.id,
+            "year": 2026,
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["teacher"],
+            self.teacher,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["month"],
+            9,
+        )
+
+    def test_teacher_monthly_salary_serializer_rejects_zero_month(self):
+        data = {
+            "teacher": self.teacher.id,
+            "year": 2026,
+            "month": 0,
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_serializer_rejects_month_over_12(self):
+        data = {
+            "teacher": self.teacher.id,
+            "year": 2026,
+            "month": 13,
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_serializer_rejects_non_teacher(self):
+        finance_user = User.objects.create_user(
+            username="serializer_finance_user",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        data = {
+            "teacher": finance_user.id,
+            "year": 2026,
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("teacher", serializer.errors) 
+
+    def test_teacher_monthly_salary_serializer_rejects_non_integer_year_and_month(self):
+        data = {
+            "teacher": self.teacher.id,
+            "year": "twenty twenty-six",
+            "month": "September",
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("year", serializer.errors)
+        self.assertIn("month", serializer.errors)
+
+    def test_salary_serializer_calculated_amount_and_final_amount_are_read_only(self):
+        serializer = SalarySerializer()
+
+        self.assertTrue(
+            serializer.fields["calculated_amount"].read_only
+        )
+
+        self.assertTrue(
+            serializer.fields["final_amount"].read_only
+        ) 
+
+
+class TeacherMonthlySalaryViewTests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="salary_view_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher = User.objects.create_user(
+            username="salary_view_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary View School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary View Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        self.classroom = Class.objects.create(
+            title="Salary View Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher,
+            classroom=self.classroom,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Salary view test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        self.url = "/api/teacher-monthly-salary/calculate/"
+
+
+    def test_finance_can_calculate_teacher_monthly_salary(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["teacher"],
+            self.teacher.id,
+        )
+
+        self.assertEqual(
+            response.data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            response.data["month"],
+            9,
+        )
+
+        self.assertEqual(
+            response.data["calculated_amount"],
+            "200000.00",
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        ) 
+
+    def test_teacher_cannot_calculate_teacher_monthly_salary(self):
+        self.client.force_authenticate(user=self.teacher)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        ) 
+
+    def test_education_cannot_calculate_teacher_monthly_salary(self):
+        education_user = User.objects.create_user(
+            username="salary_view_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_unauthenticated_user_cannot_calculate_teacher_monthly_salary(self):
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    def test_calculate_salary_requires_teacher(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "teacher",
+            response.data,
+        )
+
+    def test_calculate_salary_requires_year(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "year",
+            response.data,
+        ) 
+
+    def test_calculate_salary_requires_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )
+
+    def test_calculate_salary_rejects_zero_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 0,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        ) 
+
+    def test_calculate_salary_rejects_month_over_12(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 13,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )
+
+    def test_calculate_salary_rejects_invalid_teacher(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": 999999,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "teacher",
+            response.data,
+        )
+
+    def test_calculate_salary_fails_when_no_reports_exist(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 10,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "No session reports found for this teacher in this month.",
+        )
+
+    def test_calculate_salary_fails_when_report_is_unapproved(self):
+        SessionReport.objects.filter(
+            teacher_assignment=self.assignment,
+        ).update(
+            status=SessionReportStatus.PENDING,
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "Salary cannot be calculated until all reports for the month are approved.",
+        )
+
+    def test_calculate_salary_excludes_late_approved_report(self):
+        SessionReport.objects.create(
+            session=Session.objects.create(
+                classroom=self.classroom,
+                session_number=2,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, 15, 10, 0),
+                ),
+            ),
+            teacher_assignment=self.assignment,
+            lesson_summary="Late approved report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["calculated_amount"],
+            "200000.00",
+        ) 
+
+    def test_calculate_salary_fails_without_teacher_term_rate(self):
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher,
+            term=self.term,
+        ).delete()
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "No teacher term rate exists for this teacher and term.",
+        ) 
+
+    def test_recalculate_salary_updates_existing_salary(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        first_response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            first_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        first_salary_id = first_response.data["id"]
+
+        second_session = Session.objects.create(
+            classroom=self.classroom,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session,
+            teacher_assignment=self.assignment,
+            lesson_summary="Second approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            second_response.data["id"],
+            first_salary_id,
+        )
+
+        self.assertEqual(
+            second_response.data["calculated_amount"],
+            "400000.00",
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        )              
