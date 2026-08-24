@@ -3121,4 +3121,56 @@ class TeacherMonthlySalaryViewTests(APITestCase):
         self.assertIn(
             "teacher",
             response.data,
-        )                                    
+        )
+
+    def test_calculate_salary_fails_when_no_reports_exist(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 10,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "No session reports found for this teacher in this month.",
+        )
+
+    def test_calculate_salary_fails_when_report_is_unapproved(self):
+        SessionReport.objects.filter(
+            teacher_assignment=self.assignment,
+        ).update(
+            status=SessionReportStatus.PENDING,
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "teacher": self.teacher.id,
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "Salary cannot be calculated until all reports for the month are approved.",
+        )    
