@@ -2802,4 +2802,15 @@ class SalarySerializerTests(TestCase):
         self.assertFalse(serializer.is_valid())
 
         self.assertIn("year", serializer.errors)
-        self.assertIn("month", serializer.errors)                   
+        self.assertIn("month", serializer.errors)
+
+    def test_salary_serializer_calculated_amount_and_final_amount_are_read_only(self):
+        serializer = SalarySerializer()
+
+        self.assertTrue(
+            serializer.fields["calculated_amount"].read_only
+        )
+
+        self.assertTrue(
+            serializer.fields["final_amount"].read_only
+        )                       
