@@ -2146,4 +2146,94 @@ class SalaryCalculationServiceTests(TestCase):
                 teacher=self.teacher,
                 year=2026,
                 month=9,
-            )                       
+            )
+
+    def test_salary_calculation_matches_document_example(self):
+        # 10 sessions of 90 minutes
+        for session_number in range(10, 20):
+            session = Session.objects.create(
+                classroom=self.class_90,
+                session_number=session_number,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, session_number - 9, 10, 0),
+                ),
+            )
+
+            SessionReport.objects.create(
+                session=session,
+                teacher_assignment=self.assignment_90,
+                lesson_summary="90 minute session",
+                present_count=10,
+                absent_count=0,
+                status=SessionReportStatus.APPROVED,
+                is_late=False,
+            )
+
+        # 2 sessions of 60 minutes
+        for session_number in range(20, 22):
+            session = Session.objects.create(
+                classroom=self.class_60,
+                session_number=session_number,
+                session_date=timezone.make_aware(
+                    datetime(2026, 9, session_number - 17, 10, 0),
+                ),
+            )
+
+            SessionReport.objects.create(
+                session=session,
+                teacher_assignment=self.assignment_60,
+                lesson_summary="60 minute session",
+                present_count=10,
+                absent_count=0,
+                status=SessionReportStatus.APPROVED,
+                is_late=False,
+            )
+
+        # 1 session of 120 minutes
+        session_120 = Session.objects.create(
+            classroom=self.class_120,
+            session_number=22,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 23, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_120,
+            teacher_assignment=self.assignment_120,
+            lesson_summary="120 minute session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        # 1 approved but late session → excluded
+        late_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=23,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 24, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=late_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Late session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("2540000.00"),
+        )                               
