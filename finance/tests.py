@@ -2786,4 +2786,20 @@ class SalarySerializerTests(TestCase):
 
         self.assertFalse(serializer.is_valid())
 
-        self.assertIn("teacher", serializer.errors)                
+        self.assertIn("teacher", serializer.errors) 
+
+    def test_teacher_monthly_salary_serializer_rejects_non_integer_year_and_month(self):
+        data = {
+            "teacher": self.teacher.id,
+            "year": "twenty twenty-six",
+            "month": "September",
+        }
+
+        serializer = TeacherMonthlySalaryCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("year", serializer.errors)
+        self.assertIn("month", serializer.errors)                   
