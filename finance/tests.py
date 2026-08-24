@@ -2280,5 +2280,76 @@ class SalaryCalculationServiceTests(TestCase):
             Decimal("200000.00"),
         )
         self.assertEqual(salary.adjustment_reason, "") 
-        
-                                         
+
+    def test_recalculating_same_month_updates_existing_salary(self):
+        first_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=25,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 26, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=first_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="First salary calculation",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        first_salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            first_salary.calculated_amount,
+            Decimal("200000.00"),
+        )
+
+        second_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=26,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 27, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Second salary calculation",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_salary = calculate_teacher_monthly_salary(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            second_salary.id,
+            first_salary.id,
+        )
+
+        self.assertEqual(
+            second_salary.calculated_amount,
+            Decimal("400000.00"),
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        )                                     
