@@ -9,7 +9,11 @@ from rest_framework.test import APIRequestFactory, APITestCase
 from academic.models import Class, Session, TeacherAssignment, Term
 from account.models import User, UserRole
 from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTermRate
-from finance.serializers import SessionReportSerializer, TeacherTermRateSerializer
+from finance.serializers import (
+    SalarySerializer,
+    SessionReportSerializer,
+    TeacherTermRateSerializer,
+)
 from finance.services import (
     calculate_teacher_monthly_salary,
     calculate_teacher_monthly_salary_amount,
@@ -2624,4 +2628,79 @@ class SalaryCalculationServiceTests(TestCase):
         self.assertEqual(
             amount,
             Decimal("200000.00"),
+        )
+
+
+
+class SalarySerializerTests(TestCase):
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="salary_serializer_teacher",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary Serializer School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary Serializer Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+    def test_salary_serializer_returns_salary_data(self):
+        salary = Salary.objects.create(
+            teacher=self.teacher,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("200000.00"),
+            final_amount=Decimal("200000.00"),
+            adjustment_reason="",
+        )
+
+        serializer = SalarySerializer(salary)
+
+        self.assertEqual(
+            serializer.data["id"],
+            salary.id,
+        )
+
+        self.assertEqual(
+            serializer.data["teacher"],
+            self.teacher.id,
+        )
+
+        self.assertEqual(
+            serializer.data["term"],
+            self.term.id,
+        )
+
+        self.assertEqual(
+            serializer.data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.data["month"],
+            9,
+        )
+
+        self.assertEqual(
+            serializer.data["calculated_amount"],
+            "200000.00",
+        )
+
+        self.assertEqual(
+            serializer.data["final_amount"],
+            "200000.00",
+        )
+
+        self.assertEqual(
+            serializer.data["adjustment_reason"],
+            "",
         )
