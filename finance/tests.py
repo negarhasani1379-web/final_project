@@ -2450,4 +2450,52 @@ class SalaryCalculationServiceTests(TestCase):
                 teacher=self.teacher,
                 year=2026,
                 month=9,
-            )                                                           
+            ) 
+
+    def test_reports_from_other_year_are_excluded(self):
+        current_year_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=30,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=current_year_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Current year session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        previous_year_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=31,
+            session_date=timezone.make_aware(
+                datetime(2025, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=previous_year_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Previous year session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        amount = calculate_teacher_monthly_salary_amount(
+            teacher=self.teacher,
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            amount,
+            Decimal("200000.00"),
+        )                                                                  
