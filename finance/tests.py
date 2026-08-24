@@ -1960,4 +1960,51 @@ class SalaryCalculationServiceTests(TestCase):
         self.assertEqual(
             amount,
             Decimal("0.00"),
-        )       
+        ) 
+
+    def test_salary_calculation_fails_when_month_has_unapproved_report(self):
+        approved_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=3,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 5, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=approved_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        pending_session = Session.objects.create(
+            classroom=self.class_90,
+            session_number=4,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=pending_session,
+            teacher_assignment=self.assignment_90,
+            lesson_summary="Pending session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Salary cannot be calculated until all reports for the month are approved.",
+        ):
+            calculate_teacher_monthly_salary_amount(
+                teacher=self.teacher,
+                year=2026,
+                month=9,
+            )          
