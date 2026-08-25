@@ -4709,6 +4709,17 @@ class TeacherMonthlySalaryListServiceTests(TestCase):
                 and salary.month == 9
                 for salary in salaries
             )
-        )                                                                
+        ) 
+
+    def test_list_teacher_monthly_salaries_returns_empty_for_month_without_salaries(self):
+        salaries = list_teacher_monthly_salaries(
+            year=2026,
+            month=11,
+        )
+
+        self.assertEqual(
+            list(salaries),
+            [],
+        )                                                                   
 
 
