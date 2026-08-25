@@ -4800,7 +4800,93 @@ class TeacherMonthlySalaryListSerializerTests(TestCase):
         self.assertFalse(serializer.is_valid())
 
         self.assertIn("year", serializer.errors)
-        self.assertIn("month", serializer.errors)                    
+        self.assertIn("month", serializer.errors) 
+
+
+class SalaryListViewTests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="salary_list_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher_1 = User.objects.create_user(
+            username="salary_list_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="salary_list_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary List View School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary List View Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("200000.00"),
+            final_amount=Decimal("200000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("300000.00"),
+            final_amount=Decimal("300000.00"),
+        )
+
+        self.url = "/api/salaries/"
+
+    def test_finance_can_list_monthly_salaries(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )
+
+        self.assertEqual(
+            {
+                item["teacher"]
+                for item in response.data
+            },
+            {
+                self.teacher_1.id,
+                self.teacher_2.id,
+            },
+        )
+
 
 
 
