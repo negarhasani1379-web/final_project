@@ -3680,4 +3680,6 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
         self.assertEqual(
             salaries[0].calculated_amount,
             Decimal("220000.00"),
-        )                           
+        ) 
+        
+                                  
