@@ -3819,6 +3819,65 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
         self.assertEqual(
             salary_by_teacher[self.teacher_2.id],
             Decimal("210000.00"),
-        )        
+        )
+
+    def test_bulk_calculation_fails_when_one_teacher_has_no_term_rate(self):
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher_2,
+            term=self.term,
+        ).delete()
+
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=8,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 26, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=8,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 27, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher term rate exists for this teacher and term.",
+        ):
+            calculate_all_teachers_monthly_salary(
+                year=2026,
+                month=9,
+            )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            0,
+        )            
 
 
