@@ -20,6 +20,7 @@ from finance.services import (
     calculate_all_teachers_monthly_salary,
     calculate_teacher_monthly_salary,
     calculate_teacher_monthly_salary_amount,
+    list_teacher_monthly_salaries,
 )
 from school.models import School
 
@@ -4621,6 +4622,93 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
             2,
         ) 
 
-                                                                
+class TeacherMonthlySalaryListServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher_1 = User.objects.create_user(
+            username="list_salary_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="list_salary_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_3 = User.objects.create_user(
+            username="list_salary_teacher_3",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary List School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary List Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("200000.00"),
+            final_amount=Decimal("200000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("300000.00"),
+            final_amount=Decimal("300000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_3,
+            term=self.term,
+            year=2026,
+            month=10,
+            calculated_amount=Decimal("400000.00"),
+            final_amount=Decimal("400000.00"),
+        )
+
+    def test_list_teacher_monthly_salaries_returns_only_selected_month(self):
+        salaries = list_teacher_monthly_salaries(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            len(salaries),
+            2,
+        )
+
+        self.assertEqual(
+            {
+                salary.teacher_id
+                for salary in salaries
+            },
+            {
+                self.teacher_1.id,
+                self.teacher_2.id,
+            },
+        )
+
+        self.assertTrue(
+            all(
+                salary.year == 2026
+                and salary.month == 9
+                for salary in salaries
+            )
+        )                                                                
 
 
