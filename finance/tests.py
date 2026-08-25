@@ -12,6 +12,7 @@ from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTe
 from finance.serializers import (
     SalarySerializer,
     SessionReportSerializer,
+    TeacherMonthlySalaryBulkCalculateSerializer,
     TeacherMonthlySalaryCalculateSerializer,
     TeacherTermRateSerializer,
 )
@@ -2814,7 +2815,32 @@ class SalarySerializerTests(TestCase):
 
         self.assertTrue(
             serializer.fields["final_amount"].read_only
-        ) 
+        )
+
+    def test_teacher_monthly_salary_bulk_serializer_accepts_valid_data(self):
+        data = {
+            "year": 2026,
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["month"],
+            9,
+        )     
 
 
 class TeacherMonthlySalaryViewTests(APITestCase):
