@@ -16,6 +16,7 @@ from finance.serializers import (
     TeacherTermRateSerializer,
 )
 from finance.services import (
+    calculate_all_teachers_monthly_salary,
     calculate_teacher_monthly_salary,
     calculate_teacher_monthly_salary_amount,
 )
@@ -3312,4 +3313,141 @@ class TeacherMonthlySalaryViewTests(APITestCase):
                 month=9,
             ).count(),
             1,
-        )              
+        ) 
+
+
+class BulkTeacherMonthlySalaryServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher_1 = User.objects.create_user(
+            username="bulk_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="bulk_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Bulk Salary School",
+        )
+
+        self.term = Term.objects.create(
+            title="Bulk Salary Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+        self.class_1 = Class.objects.create(
+            title="Teacher 1 Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.class_2 = Class.objects.create(
+            title="Teacher 2 Class",
+            school=self.school,
+            term=self.term,
+            session_duration=60,
+        )
+
+        self.assignment_1 = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=self.class_1,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_2 = TeacherAssignment.objects.create(
+            teacher=self.teacher_2,
+            classroom=self.class_2,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+    def test_bulk_calculation_creates_salary_for_all_teachers(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 11, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 2)
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_1,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("200000.00"),
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_2,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("140000.00"),
+        )        
