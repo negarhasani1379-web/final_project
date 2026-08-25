@@ -3755,6 +3755,70 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
         self.assertEqual(
             salary_by_teacher[self.teacher_2.id],
             Decimal("140000.00"),
-        )     
+        ) 
+
+    def test_bulk_calculation_uses_each_teacher_own_base_rate(self):
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher_2,
+            term=self.term,
+        ).update(
+            base_rate=Decimal("300000.00"),
+        )
+
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=7,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 24, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 rate test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=7,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 25, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 rate test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        salary_by_teacher = {
+            salary.teacher_id: salary.calculated_amount
+            for salary in salaries
+        }
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_1.id],
+            Decimal("200000.00"),
+        )
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_2.id],
+            Decimal("210000.00"),
+        )        
 
 
