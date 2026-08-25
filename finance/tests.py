@@ -4475,6 +4475,26 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
         self.assertIn(
             "month",
             response.data,
-        )                                                        
+        ) 
+
+    def test_bulk_salary_rejects_non_integer_values(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": "abc",
+                "month": "September",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn("year", response.data)
+        self.assertIn("month", response.data)                                                           
 
 
