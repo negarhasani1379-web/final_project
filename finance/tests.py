@@ -4961,7 +4961,27 @@ class SalaryListViewTests(APITestCase):
                 and item["month"] == 9
                 for item in response.data
             )
-        )        
+        )
+
+    def test_salary_list_requires_year(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "year",
+            response.data,
+        )            
 
 
 
