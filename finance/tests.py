@@ -4517,6 +4517,54 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
         self.assertEqual(
             response.data["detail"],
             "No teacher session reports found for this month.",
-        )                                                              
+        ) 
+
+    def test_bulk_salary_fails_when_one_teacher_has_unapproved_report(self):
+        session = Session.objects.create(
+            classroom=self.class_2,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Unapproved bulk view report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "Salary cannot be calculated until all reports for the month are approved.",
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            0,
+        )                                                                 
 
 
