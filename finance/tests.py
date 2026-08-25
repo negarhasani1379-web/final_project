@@ -5001,7 +5001,28 @@ class SalaryListViewTests(APITestCase):
         self.assertIn(
             "month",
             response.data,
-        )               
+        )
+
+    def test_salary_list_rejects_zero_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 0,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )                   
 
 
 
