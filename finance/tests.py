@@ -4888,6 +4888,28 @@ class SalaryListViewTests(APITestCase):
         )
 
 
+    def test_salary_list_returns_empty_for_month_without_salaries(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 10,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data,
+            [],
+        )    
+
+
 
 
 
