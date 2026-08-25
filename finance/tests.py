@@ -3878,6 +3878,66 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
                 month=9,
             ).count(),
             0,
-        )            
+        )
+
+    def test_bulk_calculation_creates_one_salary_per_teacher(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=9,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 28, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=9,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 29, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 2)
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).values("teacher_id").distinct().count(),
+            2,
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )                
 
 
