@@ -4724,27 +4724,29 @@ class TeacherMonthlySalaryListServiceTests(TestCase):
         )
 class TeacherMonthlySalaryListSerializerTests(TestCase):
 
-        def test_teacher_monthly_salary_list_serializer_accepts_valid_data(self):
-            serializer = TeacherMonthlySalaryListSerializer(
-                data={
-                    "year": 2026,
-                    "month": 9,
-                }
-            )
+    def test_teacher_monthly_salary_list_serializer_accepts_valid_data(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": 2026,
+                "month": 9,
+            }
+        )
 
-            self.assertTrue(
-                serializer.is_valid(),
-                serializer.errors,
-            )
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
 
-            self.assertEqual(
-                serializer.validated_data["year"],
-                2026,
-            )
+        self.assertEqual(
+            serializer.validated_data["year"],
+            2026,
+        )
 
-            self.assertEqual(
-                serializer.validated_data["month"],
-                9,
-            )                                                                
+        self.assertEqual(
+            serializer.validated_data["month"],
+            9,
+        ) 
+
+
 
 
