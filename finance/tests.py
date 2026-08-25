@@ -4565,6 +4565,62 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
                 month=9,
             ).count(),
             0,
-        )                                                                 
+        )
+
+    def test_bulk_salary_recalculation_does_not_create_duplicates(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        first_response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            first_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        first_ids = {
+            item["teacher"]: item["id"]
+            for item in first_response.data
+        }
+
+        second_response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        second_ids = {
+            item["teacher"]: item["id"]
+            for item in second_response.data
+        }
+
+        self.assertEqual(
+            first_ids,
+            second_ids,
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        ) 
+
+                                                                          
 
 
