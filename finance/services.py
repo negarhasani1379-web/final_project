@@ -187,5 +187,14 @@ def calculate_all_teachers_monthly_salary(year, month):
 
     return salaries
 
+def list_teacher_monthly_salaries(year, month):
+    return Salary.objects.filter(
+        year=year,
+        month=month,
+    ).select_related(
+        "teacher",
+        "term",
+    )
+
 
 

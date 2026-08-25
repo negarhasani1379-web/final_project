@@ -14,12 +14,14 @@ from finance.serializers import (
     SessionReportSerializer,
     TeacherMonthlySalaryBulkCalculateSerializer,
     TeacherMonthlySalaryCalculateSerializer,
+    TeacherMonthlySalaryListSerializer,
     TeacherTermRateSerializer,
 )
 from finance.services import (
     calculate_all_teachers_monthly_salary,
     calculate_teacher_monthly_salary,
     calculate_teacher_monthly_salary_amount,
+    list_teacher_monthly_salaries,
 )
 from school.models import School
 
@@ -4621,6 +4623,505 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
             2,
         ) 
 
-                                                                
+class TeacherMonthlySalaryListServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher_1 = User.objects.create_user(
+            username="list_salary_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="list_salary_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_3 = User.objects.create_user(
+            username="list_salary_teacher_3",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary List School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary List Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("200000.00"),
+            final_amount=Decimal("200000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("300000.00"),
+            final_amount=Decimal("300000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_3,
+            term=self.term,
+            year=2026,
+            month=10,
+            calculated_amount=Decimal("400000.00"),
+            final_amount=Decimal("400000.00"),
+        )
+
+    def test_list_teacher_monthly_salaries_returns_only_selected_month(self):
+        salaries = list_teacher_monthly_salaries(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(
+            len(salaries),
+            2,
+        )
+
+        self.assertEqual(
+            {
+                salary.teacher_id
+                for salary in salaries
+            },
+            {
+                self.teacher_1.id,
+                self.teacher_2.id,
+            },
+        )
+
+        self.assertTrue(
+            all(
+                salary.year == 2026
+                and salary.month == 9
+                for salary in salaries
+            )
+        ) 
+
+    def test_list_teacher_monthly_salaries_returns_empty_for_month_without_salaries(self):
+        salaries = list_teacher_monthly_salaries(
+            year=2026,
+            month=11,
+        )
+
+        self.assertEqual(
+            list(salaries),
+            [],
+        )
+class TeacherMonthlySalaryListSerializerTests(TestCase):
+
+    def test_teacher_monthly_salary_list_serializer_accepts_valid_data(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": 2026,
+                "month": 9,
+            }
+        )
+
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["month"],
+            9,
+        )
+
+    def test_teacher_monthly_salary_list_serializer_requires_year(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "month": 9,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("year", serializer.errors) 
+
+    def test_teacher_monthly_salary_list_serializer_requires_month(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": 2026,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_list_serializer_rejects_zero_month(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": 2026,
+                "month": 0,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_list_serializer_rejects_month_over_12(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": 2026,
+                "month": 13,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_list_serializer_rejects_non_integer_values(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": "abc",
+                "month": "September",
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("year", serializer.errors)
+        self.assertIn("month", serializer.errors) 
+
+
+class SalaryListViewTests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="salary_list_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher_1 = User.objects.create_user(
+            username="salary_list_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="salary_list_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Salary List View School",
+        )
+
+        self.term = Term.objects.create(
+            title="Salary List View Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("200000.00"),
+            final_amount=Decimal("200000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            year=2026,
+            month=9,
+            calculated_amount=Decimal("300000.00"),
+            final_amount=Decimal("300000.00"),
+        )
+
+        self.url = "/api/salaries/"
+
+    def test_finance_can_list_monthly_salaries(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )
+
+        self.assertEqual(
+            {
+                item["teacher"]
+                for item in response.data
+            },
+            {
+                self.teacher_1.id,
+                self.teacher_2.id,
+            },
+        )
+
+
+    def test_salary_list_returns_empty_for_month_without_salaries(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 10,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data,
+            [],
+        )
+
+    def test_salary_list_filters_by_year_and_month(self):
+        other_year_term = Term.objects.create(
+            title="Other Year Term",
+            start_date=date(2025, 9, 1),
+            end_date=date(2025, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=other_year_term,
+            year=2025,
+            month=9,
+            calculated_amount=Decimal("500000.00"),
+            final_amount=Decimal("500000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=10,
+            calculated_amount=Decimal("600000.00"),
+            final_amount=Decimal("600000.00"),
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )
+
+        self.assertTrue(
+            all(
+                item["year"] == 2026
+                and item["month"] == 9
+                for item in response.data
+            )
+        )
+
+    def test_salary_list_requires_year(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "year",
+            response.data,
+        ) 
+
+    def test_salary_list_requires_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )
+
+    def test_salary_list_rejects_zero_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 0,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        ) 
+
+    def test_salary_list_rejects_month_over_12(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 13,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )
+
+    def test_salary_list_rejects_non_integer_values(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": "abc",
+                "month": "September",
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn("year", response.data)
+        self.assertIn("month", response.data)                          
+
+    
+    def test_teacher_cannot_list_monthly_salaries(self):
+        self.client.force_authenticate(user=self.teacher_1)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+
+    def test_education_cannot_list_monthly_salaries(self):
+        education_user = User.objects.create_user(
+            username="salary_list_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        ) 
+
+    def test_unauthenticated_user_cannot_list_monthly_salaries(self):
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )       
+        
+    
+    
+        
+    
+
 
 
