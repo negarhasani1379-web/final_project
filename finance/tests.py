@@ -4495,6 +4495,28 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
         )
 
         self.assertIn("year", response.data)
-        self.assertIn("month", response.data)                                                           
+        self.assertIn("month", response.data) 
+
+    def test_bulk_salary_fails_when_no_teacher_reports_exist(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 10,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "No teacher session reports found for this month.",
+        )                                                              
 
 
