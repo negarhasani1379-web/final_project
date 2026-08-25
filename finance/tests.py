@@ -3514,4 +3514,107 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
                 month=9,
             ).count(),
             0,
-        )                    
+        )
+
+    def test_bulk_recalculation_updates_existing_salaries(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=3,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="First teacher session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=3,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 16, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Second teacher session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        first_salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        first_ids = {
+            salary.teacher_id: salary.id
+            for salary in first_salaries
+        }
+
+        second_session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=4,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Additional teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        second_ids = {
+            salary.teacher_id: salary.id
+            for salary in second_salaries
+        }
+
+        self.assertEqual(first_ids, second_ids)
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_1,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("400000.00"),
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_2,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("140000.00"),
+        )                        
