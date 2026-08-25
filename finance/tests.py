@@ -4776,7 +4776,18 @@ class TeacherMonthlySalaryListSerializerTests(TestCase):
         )
 
         self.assertFalse(serializer.is_valid())
-        self.assertIn("month", serializer.errors)            
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_list_serializer_rejects_month_over_12(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data={
+                "year": 2026,
+                "month": 13,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("month", serializer.errors)                
 
 
 
