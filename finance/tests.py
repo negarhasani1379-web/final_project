@@ -4181,6 +4181,159 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
         self.assertEqual(
             salaries[0].calculated_amount,
             Decimal("400000.00"),
-        )                        
+        )
+
+class TeacherMonthlySalaryBulkViewTests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="bulk_view_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher_1 = User.objects.create_user(
+            username="bulk_view_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="bulk_view_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Bulk View School",
+        )
+
+        self.term = Term.objects.create(
+            title="Bulk View Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        self.class_1 = Class.objects.create(
+            title="Bulk View Class 1",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.class_2 = Class.objects.create(
+            title="Bulk View Class 2",
+            school=self.school,
+            term=self.term,
+            session_duration=60,
+        )
+
+        self.assignment_1 = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=self.class_1,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_2 = TeacherAssignment.objects.create(
+            teacher=self.teacher_2,
+            classroom=self.class_2,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 bulk view session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 11, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 bulk view session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        self.url = "/api/teacher-monthly-salary/calculate-all/"
+
+    def test_finance_can_calculate_all_teachers_monthly_salary(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )
+
+        teachers = {
+            item["teacher"]
+            for item in response.data
+        }
+
+        self.assertEqual(
+            teachers,
+            {
+                self.teacher_1.id,
+                self.teacher_2.id,
+            },
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )                                
 
 
