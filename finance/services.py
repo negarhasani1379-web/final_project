@@ -1,5 +1,8 @@
 from decimal import Decimal
 
+from django.db import transaction
+
+from account.models import User, UserRole
 from finance.models import (
     Salary,
     SessionReport,
@@ -146,4 +149,43 @@ def calculate_teacher_monthly_salary(
     return salary
 
 
-    
+@transaction.atomic
+def calculate_all_teachers_monthly_salary(year, month):
+    teacher_ids = (
+        SessionReport.objects
+        .filter(
+            session__session_date__year=year,
+            session__session_date__month=month,
+            teacher_assignment__teacher__role=UserRole.TEACHER,
+        )
+        .values_list(
+            "teacher_assignment__teacher_id",
+            flat=True,
+        )
+        .distinct()
+    )
+
+    if not teacher_ids:
+        raise ValueError(
+            "No teacher session reports found for this month."
+        )
+
+    teachers = User.objects.filter(
+        id__in=teacher_ids,
+        role=UserRole.TEACHER,
+    )
+
+    salaries = []
+
+    for teacher in teachers:
+        salary = calculate_teacher_monthly_salary(
+            teacher=teacher,
+            year=year,
+            month=month,
+        )
+        salaries.append(salary)
+
+    return salaries
+
+
+

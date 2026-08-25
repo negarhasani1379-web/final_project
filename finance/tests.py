@@ -12,10 +12,12 @@ from finance.models import Salary, SessionReport, SessionReportStatus, TeacherTe
 from finance.serializers import (
     SalarySerializer,
     SessionReportSerializer,
+    TeacherMonthlySalaryBulkCalculateSerializer,
     TeacherMonthlySalaryCalculateSerializer,
     TeacherTermRateSerializer,
 )
 from finance.services import (
+    calculate_all_teachers_monthly_salary,
     calculate_teacher_monthly_salary,
     calculate_teacher_monthly_salary_amount,
 )
@@ -2813,8 +2815,101 @@ class SalarySerializerTests(TestCase):
 
         self.assertTrue(
             serializer.fields["final_amount"].read_only
-        ) 
+        )
 
+    def test_teacher_monthly_salary_bulk_serializer_accepts_valid_data(self):
+        data = {
+            "year": 2026,
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertTrue(
+            serializer.is_valid(),
+            serializer.errors,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["year"],
+            2026,
+        )
+
+        self.assertEqual(
+            serializer.validated_data["month"],
+            9,
+        )
+
+    def test_teacher_monthly_salary_bulk_serializer_requires_year(self):
+        data = {
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("year", serializer.errors)
+
+    def test_teacher_monthly_salary_bulk_serializer_requires_month(self):
+        data = {
+            "year": 2026,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_bulk_serializer_rejects_zero_month(self):
+        data = {
+            "year": 2026,
+            "month": 0,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_bulk_serializer_rejects_month_over_12(self):
+        data = {
+            "year": 2026,
+            "month": 13,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("month", serializer.errors)
+
+    def test_teacher_monthly_salary_bulk_serializer_rejects_non_integer_values(self):
+        data = {
+            "year": "abc",
+            "month": "September",
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("year", serializer.errors)
+        self.assertIn("month", serializer.errors)
 
 class TeacherMonthlySalaryViewTests(APITestCase):
 
@@ -3312,4 +3407,1220 @@ class TeacherMonthlySalaryViewTests(APITestCase):
                 month=9,
             ).count(),
             1,
-        )              
+        ) 
+
+
+class BulkTeacherMonthlySalaryServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher_1 = User.objects.create_user(
+            username="bulk_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="bulk_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Bulk Salary School",
+        )
+
+        self.term = Term.objects.create(
+            title="Bulk Salary Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type="normal",
+        )
+
+        self.class_1 = Class.objects.create(
+            title="Teacher 1 Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.class_2 = Class.objects.create(
+            title="Teacher 2 Class",
+            school=self.school,
+            term=self.term,
+            session_duration=60,
+        )
+
+        self.assignment_1 = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=self.class_1,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_2 = TeacherAssignment.objects.create(
+            teacher=self.teacher_2,
+            classroom=self.class_2,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+    def test_bulk_calculation_creates_salary_for_all_teachers(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 11, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 2)
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_1,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("200000.00"),
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_2,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("140000.00"),
+        )
+
+    def test_bulk_calculation_fails_when_no_teacher_reports_exist(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher session reports found for this month.",
+        ):
+            calculate_all_teachers_monthly_salary(
+                year=2026,
+                month=10,
+            )
+
+    def test_bulk_calculation_rolls_back_when_one_teacher_has_unapproved_report(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 12, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 approved session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 13, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 pending session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Salary cannot be calculated until all reports for the month are approved.",
+        ):
+            calculate_all_teachers_monthly_salary(
+                year=2026,
+                month=9,
+            )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            0,
+        )
+
+    def test_bulk_recalculation_updates_existing_salaries(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=3,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="First teacher session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=3,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 16, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Second teacher session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        first_salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        first_ids = {
+            salary.teacher_id: salary.id
+            for salary in first_salaries
+        }
+
+        second_session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=4,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Additional teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        second_ids = {
+            salary.teacher_id: salary.id
+            for salary in second_salaries
+        }
+
+        self.assertEqual(first_ids, second_ids)
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_1,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("400000.00"),
+        )
+
+        self.assertEqual(
+            Salary.objects.get(
+                teacher=self.teacher_2,
+                year=2026,
+                month=9,
+            ).calculated_amount,
+            Decimal("140000.00"),
+        ) 
+
+    def test_bulk_calculation_applies_summer_bonus(self):
+        summer_term = Term.objects.create(
+            title="Bulk Summer Term",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 8, 31),
+            term_type=TermType.SUMMER,
+        )
+
+        summer_class = Class.objects.create(
+            title="Bulk Summer Class",
+            school=self.school,
+            term=summer_term,
+            session_duration=90,
+        )
+
+        summer_assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=summer_class,
+            start_date=summer_term.start_date,
+            end_date=summer_term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_1,
+            term=summer_term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session = Session.objects.create(
+            classroom=summer_class,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 8, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=summer_assignment,
+            lesson_summary="Summer bulk session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=8,
+        )
+
+        self.assertEqual(len(salaries), 1)
+
+        self.assertEqual(
+            salaries[0].teacher_id,
+            self.teacher_1.id,
+        )
+
+        self.assertEqual(
+            salaries[0].calculated_amount,
+            Decimal("220000.00"),
+        )
+
+    def test_bulk_calculation_excludes_late_report_only_for_that_teacher(self):
+        teacher_1_normal_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=5,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=teacher_1_normal_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 normal session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        teacher_1_late_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=6,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 21, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=teacher_1_late_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 late session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        teacher_2_session = Session.objects.create(
+            classroom=self.class_2,
+            session_number=5,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 22, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=teacher_2_session,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 normal session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        salary_by_teacher = {
+            salary.teacher_id: salary.calculated_amount
+            for salary in salaries
+        }
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_1.id],
+            Decimal("200000.00"),
+        )
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_2.id],
+            Decimal("140000.00"),
+        ) 
+
+    def test_bulk_calculation_uses_each_teacher_own_base_rate(self):
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher_2,
+            term=self.term,
+        ).update(
+            base_rate=Decimal("300000.00"),
+        )
+
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=7,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 24, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 rate test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=7,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 25, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 rate test",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        salary_by_teacher = {
+            salary.teacher_id: salary.calculated_amount
+            for salary in salaries
+        }
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_1.id],
+            Decimal("200000.00"),
+        )
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_2.id],
+            Decimal("210000.00"),
+        )
+
+    def test_bulk_calculation_fails_when_one_teacher_has_no_term_rate(self):
+        TeacherTermRate.objects.filter(
+            teacher=self.teacher_2,
+            term=self.term,
+        ).delete()
+
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=8,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 26, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=8,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 27, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher term rate exists for this teacher and term.",
+        ):
+            calculate_all_teachers_monthly_salary(
+                year=2026,
+                month=9,
+            )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            0,
+        )
+
+    def test_bulk_calculation_creates_one_salary_per_teacher(self):
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=9,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 28, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=9,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 29, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 2)
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).values("teacher_id").distinct().count(),
+            2,
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        )
+
+    def test_bulk_calculation_uses_only_selected_year_and_month(self):
+        september_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=10,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=september_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Selected month session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        october_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=11,
+            session_date=timezone.make_aware(
+                datetime(2026, 10, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=october_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Other month session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        previous_year_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=12,
+            session_date=timezone.make_aware(
+                datetime(2025, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=previous_year_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Other year session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 1)
+
+        self.assertEqual(
+            salaries[0].teacher_id,
+            self.teacher_1.id,
+        )
+
+        self.assertEqual(
+            salaries[0].calculated_amount,
+            Decimal("200000.00"),
+        )
+
+    def test_bulk_calculation_creates_one_salary_for_teacher_with_multiple_assignments(self):
+        second_class = Class.objects.create(
+            title="Teacher 1 Second Class",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        second_assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=second_class,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        first_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=13,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=first_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="First assignment session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        second_session = Session.objects.create(
+            classroom=second_class,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 11, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=second_session,
+            teacher_assignment=second_assignment,
+            lesson_summary="Second assignment session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 1)
+
+        self.assertEqual(
+            salaries[0].teacher_id,
+            self.teacher_1.id,
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                teacher=self.teacher_1,
+                year=2026,
+                month=9,
+            ).count(),
+            1,
+        )
+
+        self.assertEqual(
+            salaries[0].calculated_amount,
+            Decimal("400000.00"),
+        )
+
+class TeacherMonthlySalaryBulkViewTests(APITestCase):
+
+    def setUp(self):
+        self.finance_user = User.objects.create_user(
+            username="bulk_view_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.teacher_1 = User.objects.create_user(
+            username="bulk_view_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="bulk_view_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.school = School.objects.create(
+            name="Bulk View School",
+        )
+
+        self.term = Term.objects.create(
+            title="Bulk View Term",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        self.class_1 = Class.objects.create(
+            title="Bulk View Class 1",
+            school=self.school,
+            term=self.term,
+            session_duration=90,
+        )
+
+        self.class_2 = Class.objects.create(
+            title="Bulk View Class 2",
+            school=self.school,
+            term=self.term,
+            session_duration=60,
+        )
+
+        self.assignment_1 = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=self.class_1,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        self.assignment_2 = TeacherAssignment.objects.create(
+            teacher=self.teacher_2,
+            classroom=self.class_2,
+            start_date=self.term.start_date,
+            end_date=self.term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session_1 = Session.objects.create(
+            classroom=self.class_1,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_1,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 bulk view session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        session_2 = Session.objects.create(
+            classroom=self.class_2,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 11, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session_2,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 bulk view session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        self.url = "/api/teacher-monthly-salary/calculate-all/"
+
+    def test_finance_can_calculate_all_teachers_monthly_salary(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )
+
+        teachers = {
+            item["teacher"]
+            for item in response.data
+        }
+
+        self.assertEqual(
+            teachers,
+            {
+                self.teacher_1.id,
+                self.teacher_2.id,
+            },
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        ) 
+
+    def test_teacher_cannot_calculate_all_teachers_monthly_salary(self):
+        self.client.force_authenticate(user=self.teacher_1)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_education_cannot_calculate_all_teachers_monthly_salary(self):
+        education_user = User.objects.create_user(
+            username="bulk_view_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        ) 
+
+    def test_unauthenticated_user_cannot_calculate_all_teachers_monthly_salary(self):
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        ) 
+
+    def test_bulk_salary_requires_year(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "year",
+            response.data,
+        )
+
+    def test_bulk_salary_requires_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )
+
+    def test_bulk_salary_rejects_zero_month(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 0,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        ) 
+
+    def test_bulk_salary_rejects_month_over_12(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 13,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        ) 
+
+    def test_bulk_salary_rejects_non_integer_values(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": "abc",
+                "month": "September",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn("year", response.data)
+        self.assertIn("month", response.data) 
+
+    def test_bulk_salary_fails_when_no_teacher_reports_exist(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 10,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "No teacher session reports found for this month.",
+        ) 
+
+    def test_bulk_salary_fails_when_one_teacher_has_unapproved_report(self):
+        session = Session.objects.create(
+            classroom=self.class_2,
+            session_number=2,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 15, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Unapproved bulk view report",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.PENDING,
+            is_late=False,
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertEqual(
+            response.data["detail"],
+            "Salary cannot be calculated until all reports for the month are approved.",
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            0,
+        )
+
+    def test_bulk_salary_recalculation_does_not_create_duplicates(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        first_response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            first_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        first_ids = {
+            item["teacher"]: item["id"]
+            for item in first_response.data
+        }
+
+        second_response = self.client.post(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        second_ids = {
+            item["teacher"]: item["id"]
+            for item in second_response.data
+        }
+
+        self.assertEqual(
+            first_ids,
+            second_ids,
+        )
+
+        self.assertEqual(
+            Salary.objects.filter(
+                year=2026,
+                month=9,
+            ).count(),
+            2,
+        ) 
+
+                                                                
+
+

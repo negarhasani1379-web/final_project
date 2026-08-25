@@ -11,10 +11,14 @@ from finance.serializers import (
     SalarySerializer,
     SessionReportReviewSerializer,
     SessionReportSerializer,
+    TeacherMonthlySalaryBulkCalculateSerializer,
     TeacherMonthlySalaryCalculateSerializer,
     TeacherTermRateSerializer,
 )
-from finance.services import calculate_teacher_monthly_salary
+from finance.services import (
+    calculate_all_teachers_monthly_salary,
+    calculate_teacher_monthly_salary,
+)
 
 
 class TeacherTermRateListCreateView(generics.ListCreateAPIView):
@@ -172,3 +176,31 @@ class TeacherMonthlySalaryCalculateView(generics.CreateAPIView):
             SalarySerializer(salary).data,
             status=200,
         )
+    
+
+class TeacherMonthlySalaryBulkCalculateView(generics.CreateAPIView):
+    serializer_class = TeacherMonthlySalaryBulkCalculateSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsFinance,
+    ]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            salaries = calculate_all_teachers_monthly_salary(
+                year=serializer.validated_data["year"],
+                month=serializer.validated_data["month"],
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=400,
+            )
+
+        return Response(
+            SalarySerializer(salaries, many=True).data,
+            status=200,
+        )    
