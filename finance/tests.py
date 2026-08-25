@@ -4621,6 +4621,6 @@ class TeacherMonthlySalaryBulkViewTests(APITestCase):
             2,
         ) 
 
-                                                                          
+                                                                
 
 
