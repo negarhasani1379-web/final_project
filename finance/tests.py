@@ -3617,4 +3617,67 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
                 month=9,
             ).calculated_amount,
             Decimal("140000.00"),
-        )                        
+        ) 
+
+    def test_bulk_calculation_applies_summer_bonus(self):
+        summer_term = Term.objects.create(
+            title="Bulk Summer Term",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 8, 31),
+            term_type=TermType.SUMMER,
+        )
+
+        summer_class = Class.objects.create(
+            title="Bulk Summer Class",
+            school=self.school,
+            term=summer_term,
+            session_duration=90,
+        )
+
+        summer_assignment = TeacherAssignment.objects.create(
+            teacher=self.teacher_1,
+            classroom=summer_class,
+            start_date=summer_term.start_date,
+            end_date=summer_term.end_date,
+        )
+
+        TeacherTermRate.objects.create(
+            teacher=self.teacher_1,
+            term=summer_term,
+            base_rate=Decimal("200000.00"),
+        )
+
+        session = Session.objects.create(
+            classroom=summer_class,
+            session_number=1,
+            session_date=timezone.make_aware(
+                datetime(2026, 8, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=session,
+            teacher_assignment=summer_assignment,
+            lesson_summary="Summer bulk session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=8,
+        )
+
+        self.assertEqual(len(salaries), 1)
+
+        self.assertEqual(
+            salaries[0].teacher_id,
+            self.teacher_1.id,
+        )
+
+        self.assertEqual(
+            salaries[0].calculated_amount,
+            Decimal("220000.00"),
+        )                           
