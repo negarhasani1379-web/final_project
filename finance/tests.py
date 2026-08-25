@@ -2840,7 +2840,20 @@ class SalarySerializerTests(TestCase):
         self.assertEqual(
             serializer.validated_data["month"],
             9,
-        )     
+        )
+
+    def test_teacher_monthly_salary_bulk_serializer_requires_year(self):
+        data = {
+            "month": 9,
+        }
+
+        serializer = TeacherMonthlySalaryBulkCalculateSerializer(
+            data=data
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+        self.assertIn("year", serializer.errors)         
 
 
 class TeacherMonthlySalaryViewTests(APITestCase):
