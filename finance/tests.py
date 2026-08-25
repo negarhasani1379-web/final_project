@@ -5022,9 +5022,106 @@ class SalaryListViewTests(APITestCase):
         self.assertIn(
             "month",
             response.data,
-        )                   
+        ) 
+
+    def test_salary_list_rejects_month_over_12(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 13,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn(
+            "month",
+            response.data,
+        )
+
+    def test_salary_list_rejects_non_integer_values(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": "abc",
+                "month": "September",
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertIn("year", response.data)
+        self.assertIn("month", response.data)                          
+
+    
+    def test_teacher_cannot_list_monthly_salaries(self):
+        self.client.force_authenticate(user=self.teacher_1)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
 
 
+    def test_education_cannot_list_monthly_salaries(self):
+        education_user = User.objects.create_user(
+            username="salary_list_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.client.force_authenticate(user=education_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        ) 
+
+    def test_unauthenticated_user_cannot_list_monthly_salaries(self):
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )       
+        
+    
+    
+        
+    
 
 
 
