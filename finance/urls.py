@@ -1,6 +1,7 @@
 from django.urls import path
 
 from finance.views import (
+    SalaryListView,
     SessionReportCreateView,
     SessionReportListView,
     SessionReportReviewListView,
@@ -62,6 +63,12 @@ urlpatterns = [
         "teacher-monthly-salary/calculate-all/",
         TeacherMonthlySalaryBulkCalculateView.as_view(),
         name="teacher-monthly-salary-bulk-calculate",
+    ),
+
+    path(
+        "salaries/",
+        SalaryListView.as_view(),
+        name="salary-list",
     ),    
 
 

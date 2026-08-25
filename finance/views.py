@@ -13,11 +13,13 @@ from finance.serializers import (
     SessionReportSerializer,
     TeacherMonthlySalaryBulkCalculateSerializer,
     TeacherMonthlySalaryCalculateSerializer,
+    TeacherMonthlySalaryListSerializer,
     TeacherTermRateSerializer,
 )
 from finance.services import (
     calculate_all_teachers_monthly_salary,
     calculate_teacher_monthly_salary,
+    list_teacher_monthly_salaries,
 )
 
 
@@ -203,4 +205,22 @@ class TeacherMonthlySalaryBulkCalculateView(generics.CreateAPIView):
         return Response(
             SalarySerializer(salaries, many=True).data,
             status=200,
-        )    
+        )
+
+class SalaryListView(generics.ListAPIView):
+    serializer_class = SalarySerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsFinance,
+    ]
+
+    def get_queryset(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data=self.request.query_params
+        )
+        serializer.is_valid(raise_exception=True)
+
+        return list_teacher_monthly_salaries(
+            year=serializer.validated_data["year"],
+            month=serializer.validated_data["month"],
+        )        
