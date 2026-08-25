@@ -3450,4 +3450,14 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
                 month=9,
             ).calculated_amount,
             Decimal("140000.00"),
-        )        
+        )
+
+    def test_bulk_calculation_fails_when_no_teacher_reports_exist(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "No teacher session reports found for this month.",
+        ):
+            calculate_all_teachers_monthly_salary(
+                year=2026,
+                month=10,
+            )            
