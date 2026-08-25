@@ -196,5 +196,12 @@ def list_teacher_monthly_salaries(year, month):
         "term",
     )
 
+def list_teacher_own_salaries(teacher):
+    return Salary.objects.filter(
+        teacher=teacher,
+    ).select_related(
+        "term",
+    )
+
 
 
