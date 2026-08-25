@@ -4907,7 +4907,61 @@ class SalaryListViewTests(APITestCase):
         self.assertEqual(
             response.data,
             [],
-        )    
+        )
+
+    def test_salary_list_filters_by_year_and_month(self):
+        other_year_term = Term.objects.create(
+            title="Other Year Term",
+            start_date=date(2025, 9, 1),
+            end_date=date(2025, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=other_year_term,
+            year=2025,
+            month=9,
+            calculated_amount=Decimal("500000.00"),
+            final_amount=Decimal("500000.00"),
+        )
+
+        Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=10,
+            calculated_amount=Decimal("600000.00"),
+            final_amount=Decimal("600000.00"),
+        )
+
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(
+            self.url,
+            {
+                "year": 2026,
+                "month": 9,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            2,
+        )
+
+        self.assertTrue(
+            all(
+                item["year"] == 2026
+                and item["month"] == 9
+                for item in response.data
+            )
+        )        
 
 
 
