@@ -3938,6 +3938,78 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
                 month=9,
             ).count(),
             2,
-        )                
+        )
+
+    def test_bulk_calculation_uses_only_selected_year_and_month(self):
+        september_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=10,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=september_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Selected month session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        october_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=11,
+            session_date=timezone.make_aware(
+                datetime(2026, 10, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=october_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Other month session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        previous_year_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=12,
+            session_date=timezone.make_aware(
+                datetime(2025, 9, 10, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=previous_year_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Other year session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        self.assertEqual(len(salaries), 1)
+
+        self.assertEqual(
+            salaries[0].teacher_id,
+            self.teacher_1.id,
+        )
+
+        self.assertEqual(
+            salaries[0].calculated_amount,
+            Decimal("200000.00"),
+        )                    
 
 
