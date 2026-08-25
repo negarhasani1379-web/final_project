@@ -14,6 +14,7 @@ from finance.serializers import (
     SessionReportSerializer,
     TeacherMonthlySalaryBulkCalculateSerializer,
     TeacherMonthlySalaryCalculateSerializer,
+    TeacherMonthlySalaryListSerializer,
     TeacherTermRateSerializer,
 )
 from finance.services import (
@@ -4720,6 +4721,30 @@ class TeacherMonthlySalaryListServiceTests(TestCase):
         self.assertEqual(
             list(salaries),
             [],
-        )                                                                   
+        )
+class TeacherMonthlySalaryListSerializerTests(TestCase):
+
+        def test_teacher_monthly_salary_list_serializer_accepts_valid_data(self):
+            serializer = TeacherMonthlySalaryListSerializer(
+                data={
+                    "year": 2026,
+                    "month": 9,
+                }
+            )
+
+            self.assertTrue(
+                serializer.is_valid(),
+                serializer.errors,
+            )
+
+            self.assertEqual(
+                serializer.validated_data["year"],
+                2026,
+            )
+
+            self.assertEqual(
+                serializer.validated_data["month"],
+                9,
+            )                                                                
 
 
