@@ -3680,6 +3680,81 @@ class BulkTeacherMonthlySalaryServiceTests(TestCase):
         self.assertEqual(
             salaries[0].calculated_amount,
             Decimal("220000.00"),
-        ) 
-        
-                                  
+        )
+
+    def test_bulk_calculation_excludes_late_report_only_for_that_teacher(self):
+        teacher_1_normal_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=5,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 20, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=teacher_1_normal_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 normal session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        teacher_1_late_session = Session.objects.create(
+            classroom=self.class_1,
+            session_number=6,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 21, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=teacher_1_late_session,
+            teacher_assignment=self.assignment_1,
+            lesson_summary="Teacher 1 late session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=True,
+        )
+
+        teacher_2_session = Session.objects.create(
+            classroom=self.class_2,
+            session_number=5,
+            session_date=timezone.make_aware(
+                datetime(2026, 9, 22, 10, 0),
+            ),
+        )
+
+        SessionReport.objects.create(
+            session=teacher_2_session,
+            teacher_assignment=self.assignment_2,
+            lesson_summary="Teacher 2 normal session",
+            present_count=10,
+            absent_count=0,
+            status=SessionReportStatus.APPROVED,
+            is_late=False,
+        )
+
+        salaries = calculate_all_teachers_monthly_salary(
+            year=2026,
+            month=9,
+        )
+
+        salary_by_teacher = {
+            salary.teacher_id: salary.calculated_amount
+            for salary in salaries
+        }
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_1.id],
+            Decimal("200000.00"),
+        )
+
+        self.assertEqual(
+            salary_by_teacher[self.teacher_2.id],
+            Decimal("140000.00"),
+        )     
+
+
