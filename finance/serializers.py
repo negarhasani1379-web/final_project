@@ -191,3 +191,10 @@ class TeacherMonthlySalaryCalculateSerializer(serializers.Serializer):
         min_value=1,
         max_value=12,
     )
+
+class TeacherMonthlySalaryBulkCalculateSerializer(serializers.Serializer):
+    year = serializers.IntegerField()
+    month = serializers.IntegerField(
+        min_value=1,
+        max_value=12,
+    )    
