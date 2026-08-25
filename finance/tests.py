@@ -22,6 +22,7 @@ from finance.services import (
     calculate_teacher_monthly_salary,
     calculate_teacher_monthly_salary_amount,
     list_teacher_monthly_salaries,
+    list_teacher_own_salaries,
 )
 from school.models import School
 
@@ -5116,7 +5117,236 @@ class SalaryListViewTests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_401_UNAUTHORIZED,
-        )       
+        ) 
+
+class TeacherOwnSalaryHistoryServiceTests(TestCase):
+
+    def setUp(self):
+        self.teacher_1 = User.objects.create_user(
+            username="own_salary_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="own_salary_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.term = Term.objects.create(
+            title="Own Salary Term",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        self.salary_1 = Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=8,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        self.salary_2 = Salary.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            year=2026,
+            month=8,
+            calculated_amount=Decimal("3000000.00"),
+            final_amount=Decimal("3000000.00"),
+        )
+
+    def test_teacher_gets_only_own_salary_history(self):
+        salaries = list(
+            list_teacher_own_salaries(self.teacher_1)
+        )
+
+        self.assertEqual(
+            len(salaries),
+            1,
+        )
+
+        self.assertEqual(
+            salaries[0].id,
+            self.salary_1.id,
+        )
+
+        self.assertEqual(
+            salaries[0].teacher_id,
+            self.teacher_1.id,
+        )
+
+        self.assertNotIn(
+            self.salary_2.id,
+            [salary.id for salary in salaries],
+        ) 
+
+    def test_teacher_with_no_salary_history_gets_empty_list(self):
+        teacher_3 = User.objects.create_user(
+            username="own_salary_teacher_3",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        salaries = list(
+            list_teacher_own_salaries(teacher_3)
+        )
+
+        self.assertEqual(
+            salaries,
+            [],
+        )
+
+class TeacherOwnSalaryHistoryViewTests(APITestCase):
+
+    def setUp(self):
+        self.teacher_1 = User.objects.create_user(
+            username="own_salary_view_teacher_1",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.teacher_2 = User.objects.create_user(
+            username="own_salary_view_teacher_2",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.finance_user = User.objects.create_user(
+            username="own_salary_view_finance",
+            password="Test12345",
+            role=UserRole.FINANCE,
+        )
+
+        self.education_user = User.objects.create_user(
+            username="own_salary_view_education",
+            password="Test12345",
+            role=UserRole.EDUCATION,
+        )
+
+        self.term = Term.objects.create(
+            title="Own Salary View Term",
+            start_date=date(2026, 8, 1),
+            end_date=date(2026, 9, 30),
+            term_type=TermType.NORMAL,
+        )
+
+        self.salary_1 = Salary.objects.create(
+            teacher=self.teacher_1,
+            term=self.term,
+            year=2026,
+            month=8,
+            calculated_amount=Decimal("2000000.00"),
+            final_amount=Decimal("2000000.00"),
+        )
+
+        self.salary_2 = Salary.objects.create(
+            teacher=self.teacher_2,
+            term=self.term,
+            year=2026,
+            month=8,
+            calculated_amount=Decimal("3000000.00"),
+            final_amount=Decimal("3000000.00"),
+        )
+
+        self.url = "/api/my-salaries/"
+
+    def test_teacher_can_see_only_own_salary_history(self):
+        self.client.force_authenticate(user=self.teacher_1)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["teacher"],
+            self.teacher_1.id,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.salary_1.id,
+        )
+
+    def test_teacher_cannot_see_another_teacher_salary(self):
+        self.client.force_authenticate(user=self.teacher_1)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        salary_ids = {
+            item["id"]
+            for item in response.data
+        }
+
+        self.assertNotIn(
+            self.salary_2.id,
+            salary_ids,
+        )
+
+    def test_teacher_with_no_salary_gets_empty_list(self):
+        teacher_3 = User.objects.create_user(
+            username="own_salary_view_teacher_3",
+            password="Test12345",
+            role=UserRole.TEACHER,
+        )
+
+        self.client.force_authenticate(user=teacher_3)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data,
+            [],
+        )
+
+    def test_finance_cannot_access_teacher_own_salary_history(self):
+        self.client.force_authenticate(user=self.finance_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_education_cannot_access_teacher_own_salary_history(self):
+        self.client.force_authenticate(user=self.education_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_unauthenticated_user_cannot_access_teacher_own_salary_history(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )                         
         
     
     

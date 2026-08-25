@@ -20,6 +20,7 @@ from finance.services import (
     calculate_all_teachers_monthly_salary,
     calculate_teacher_monthly_salary,
     list_teacher_monthly_salaries,
+    list_teacher_own_salaries,
 )
 
 
@@ -223,4 +224,16 @@ class SalaryListView(generics.ListAPIView):
         return list_teacher_monthly_salaries(
             year=serializer.validated_data["year"],
             month=serializer.validated_data["month"],
-        )        
+        ) 
+
+class TeacherOwnSalaryHistoryView(generics.ListAPIView):
+    serializer_class = SalarySerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsTeacher,
+    ]
+
+    def get_queryset(self):
+        return list_teacher_own_salaries(
+            self.request.user
+        )           

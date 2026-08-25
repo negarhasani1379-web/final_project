@@ -10,6 +10,7 @@ from finance.views import (
     TeacherMonthlyReportSummaryView,
     TeacherMonthlySalaryBulkCalculateView,
     TeacherMonthlySalaryCalculateView,
+    TeacherOwnSalaryHistoryView,
     TeacherTermRateListCreateView,
 )
 
@@ -69,6 +70,12 @@ urlpatterns = [
         "salaries/",
         SalaryListView.as_view(),
         name="salary-list",
+    ),
+
+    path(
+        "my-salaries/",
+        TeacherOwnSalaryHistoryView.as_view(),
+        name="teacher-own-salary-history",
     ),    
 
 
