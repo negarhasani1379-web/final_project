@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Class, TeacherAssignment, Term
+from .models import Class, Session, TeacherAssignment, Term
 
 
 @admin.register(Term)
@@ -50,4 +50,22 @@ class TeacherAssignmentAdmin(admin.ModelAdmin):
     search_fields = (
         "teacher__username",
         "classroom__title",
-    )    
+    )
+
+@admin.register(Session)
+class SessionAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "classroom",
+        "session_number",
+        "session_date",
+    )
+
+    list_filter = (
+        "classroom",
+        "session_date",
+    )
+
+    search_fields = (
+        "classroom__title",
+    )        
