@@ -407,10 +407,12 @@ Each term contains information such as:
 
 Validation was implemented to prevent invalid term dates.
 
-For example:
+Examples:
 
 * End date cannot be before start date.
-* Overlapping terms are rejected.
+* Terms cannot overlap.
+* A term must start on the first day of a month.
+* A term must end on the last day of the same month.
 
 ---
 
@@ -429,6 +431,14 @@ Implemented functionality includes:
 
 Classes provide the connection between schools and academic sessions.
 
+Session duration is validated against the supported values defined by the project implementation:
+
+```text
+60 minutes
+90 minutes
+120 minutes
+```
+
 ---
 
 # Session Management
@@ -438,10 +448,12 @@ Sessions represent individual teaching sessions belonging to a class.
 A session contains information such as:
 
 * Class
+* Session number
 * Session date
-* Session-related academic information
 
 Sessions are later connected to Session Reports in the Finance module.
+
+The system prevents duplicate session numbers and duplicate session dates within the same classroom.
 
 ---
 
@@ -462,6 +474,8 @@ Classroom
 ```
 
 This relationship is used to determine which teacher is responsible for a specific class.
+
+The system validates teacher assignment periods and prevents conflicting assignments for the same classroom during the same period.
 
 ---
 
@@ -616,6 +630,8 @@ is_late
 
 This allows the system to track delayed session reports.
 
+Late reports are excluded from the salary amount calculation.
+
 ---
 
 # Rejection & Resubmission
@@ -766,6 +782,360 @@ python manage.py test
 
 ---
 
+# Phase 4 - Salary Calculation & Final Financial Workflow
+
+## Goal
+
+The goal of Phase 4 was to complete the financial workflow of the system by calculating teacher salaries based on approved session reports and teacher-specific term rates.
+
+This phase connects the academic and session reporting modules to the final salary calculation process.
+
+The main focus was:
+
+* Defining teacher term rates
+* Calculating monthly teacher salaries
+* Supporting different session durations
+* Handling approved, pending and rejected reports
+* Excluding late reports from salary calculation
+* Supporting bulk salary calculation
+* Providing salary history for teachers
+* Providing monthly salary lists for Finance users
+* Verifying salary calculations using automated tests
+
+---
+
+# Teacher Term Rate
+
+A `TeacherTermRate` defines the base salary rate of a teacher for a specific academic term.
+
+Relationship:
+
+```text
+Teacher
+   |
+   ↓
+Teacher Term Rate
+   |
+   ↓
+Term
+```
+
+Each teacher has a separate base rate for each term.
+
+The same teacher and term cannot have more than one active rate.
+
+Example:
+
+```text
+Teacher A
+Term 1
+Base Rate = 200000
+```
+
+---
+
+# Salary Calculation
+
+Monthly salary is calculated based on approved session reports and the teacher's term rate.
+
+The supported session durations have different salary multipliers:
+
+```text
+60 minutes   → 70% of base rate
+90 minutes   → 100% of base rate
+120 minutes  → 130% of base rate
+```
+
+The calculation is:
+
+```text
+60-minute sessions
+    → count × base_rate × 0.7
+
+90-minute sessions
+    → count × base_rate
+
+120-minute sessions
+    → count × base_rate × 1.3
+```
+
+---
+
+# Salary Eligibility Rules
+
+Before calculating salary, all reports for the teacher in the target month must be approved.
+
+The system prevents salary calculation when there is:
+
+* A pending report
+* A rejected report
+
+In addition, only reports with:
+
+```text
+status = approved
+is_late = false
+```
+
+are included in the salary amount.
+
+Therefore, an approved but late report does not contribute to the calculated wage.
+
+If there are no session reports for the teacher in the target month, salary calculation is also rejected.
+
+---
+
+# Example Salary Calculation
+
+The salary calculation follows the worked example defined in the project specification.
+
+For example:
+
+```text
+Base Rate = 200000
+
+10 approved 90-minute sessions
+2 approved 60-minute sessions
+1 approved 120-minute session
+1 late session report
+```
+
+The late report is excluded from the calculation.
+
+The salary becomes:
+
+```text
+10 × 200000
++
+2 × (200000 × 0.7)
++
+1 × (200000 × 1.3)
+
+= 2000000
++ 280000
++ 260000
+
+= 2540000
+```
+
+Therefore:
+
+```text
+calculated_amount = 2540000
+final_amount      = 2540000
+```
+
+---
+
+# Monthly Salary Calculation
+
+The Finance module provides an endpoint for calculating the monthly salary of a specific teacher.
+
+Endpoint:
+
+```text
+POST /api/teacher-monthly-salary/calculate/
+```
+
+The request contains:
+
+```text
+teacher
+year
+month
+```
+
+The calculation process is:
+
+```text
+Teacher
+   |
+   ↓
+Find monthly reports
+   |
+   ↓
+Check all reports are approved
+   |
+   ↓
+Find Teacher Term Rate
+   |
+   ↓
+Select approved and non-late reports
+   |
+   ↓
+Calculate wage by session duration
+   |
+   ↓
+Create / update Salary
+```
+
+---
+
+# Bulk Salary Calculation
+
+Finance users can calculate salaries for all teachers who have session reports in a specific month.
+
+Endpoint:
+
+```text
+POST /api/teacher-monthly-salary/calculate-all/
+```
+
+This operation calculates the salary for each teacher for the requested month.
+
+The calculation uses the same validation and salary rules as individual salary calculation.
+
+---
+
+# Salary List
+
+Finance users can view monthly salary records.
+
+Endpoint:
+
+```text
+GET /api/salaries/
+```
+
+Salary records contain information such as:
+
+* Teacher
+* Term
+* Year
+* Month
+* Calculated amount
+* Final amount
+* Adjustment reason
+
+---
+
+# Teacher Salary History
+
+Teachers can view their own salary history.
+
+Endpoint:
+
+```text
+GET /api/my-salaries/
+```
+
+The endpoint only returns salaries belonging to the authenticated teacher.
+
+Teachers cannot access another teacher's salary history.
+
+---
+
+# Financial APIs
+
+The Finance module provides the following endpoints:
+
+```text
+POST  /api/teacher-term-rates/
+GET   /api/teacher-term-rates/
+
+POST  /api/teacher-monthly-salary/calculate/
+
+POST  /api/teacher-monthly-salary/calculate-all/
+
+GET   /api/salaries/
+
+GET   /api/my-salaries/
+```
+
+---
+
+# Phase 4 Testing
+
+Automated tests were added to verify the complete financial workflow.
+
+The tests cover:
+
+* Teacher term rate creation
+* Duplicate teacher term rate validation
+* Monthly salary calculation
+* Salary calculation for 60-minute sessions
+* Salary calculation for 90-minute sessions
+* Salary calculation for 120-minute sessions
+* Worked salary calculation example
+* Excluding late reports from salary calculation
+* Preventing salary calculation when reports are pending
+* Preventing salary calculation when reports are rejected
+* Preventing salary calculation when there are no reports for the month
+* Verifying calculated amount
+* Verifying final amount
+* Bulk salary calculation
+* Salary list access
+* Teacher salary history
+* Role-based financial permissions
+* End-to-end salary workflow
+
+The end-to-end tests cover the complete flow from academic data creation to final salary calculation.
+
+---
+
+# End-to-End System Workflow
+
+The complete system flow is:
+
+```text
+User Creation
+      |
+      ↓
+Authentication
+      |
+      ↓
+School Creation
+      |
+      ↓
+Term Creation
+      |
+      ↓
+Class Creation
+      |
+      ↓
+Teacher Assignment
+      |
+      ↓
+Session Creation
+      |
+      ↓
+Teacher Creates Session Report
+      |
+      ↓
+Pending
+      |
+      ↓
+Education Review
+      |
+      ├───────────────┐
+      ↓               ↓
+   Approved        Rejected
+      |               |
+      |               ↓
+      |           Teacher Edit
+      |               |
+      |               ↓
+      |            Resubmit
+      |               |
+      |               ↓
+      |            Pending
+      |
+      ↓
+Teacher Term Rate
+      |
+      ↓
+Monthly Salary Calculation
+      |
+      ↓
+Salary Record
+      |
+      ├───────────────┐
+      ↓               ↓
+Finance Salary List   Teacher Salary History
+```
+
+---
+
 # Current Project Status
 
 The project currently contains the following completed phases:
@@ -781,6 +1151,10 @@ Academic & School Management
         ↓
 Phase 3
 Session Reports & Financial Management
+        |
+        ↓
+Phase 4
+Salary Calculation & Final Financial Workflow
 ```
 
 Current implemented functionality includes:
@@ -801,8 +1175,14 @@ Current implemented functionality includes:
 * Late Submission Detection
 * Monthly Teacher Report Summary
 * Teacher Term Rates
+* Monthly Salary Calculation
+* Bulk Salary Calculation
 * Salary Management
+* Teacher Salary History
+* Finance Salary List
 * Automated Tests
+* End-to-end salary workflow testing
+* GitHub Actions CI
 
 ---
 
@@ -815,6 +1195,24 @@ python manage.py test
 ```
 
 The test suite verifies the functionality of the implemented applications and APIs.
+
+Run Account tests:
+
+```bash
+python manage.py test account
+```
+
+Run Finance tests:
+
+```bash
+python manage.py test finance
+```
+
+Run Academic tests:
+
+```bash
+python manage.py test academic
+```
 
 ---
 
@@ -884,6 +1282,8 @@ feature/account-tests
 feature/academic-app
 feature/teacher-assignment
 test/session-report-edited-at-late
+feature/session-admin
+feature/salary-end-to-end-tests
 ```
 
 Development flow:
@@ -928,3 +1328,13 @@ The overall architecture can be summarized as:
 ```
 
 The system uses Django REST Framework APIs with JWT authentication and role-based authorization across the different modules.
+
+---
+
+# Project Completion
+
+Phase 4 completes the main business workflow of the project.
+
+The final system supports the complete process from user and academic data creation to teacher session reporting, report review and approval, teacher-specific term rates, and final monthly salary calculation.
+
+The complete workflow is validated using automated tests and end-to-end financial tests.
