@@ -18,7 +18,7 @@ class TermTest(TestCase):
         term = Term(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
@@ -43,7 +43,7 @@ class TermTest(TestCase):
         term = Term(
             title="Summer 2026",
             start_date="2026-06-01",
-            end_date="2026-08-31",
+            end_date="2026-06-30",
             term_type="summer",
         )
 
@@ -56,7 +56,7 @@ class TermTest(TestCase):
         term = Term(
             title="Invalid Type Term",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="winter",
         )
 
@@ -67,13 +67,107 @@ class TermTest(TestCase):
         term = Term(
             title="",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
         with self.assertRaises(ValidationError):
             term.full_clean() 
 
+    def test_term_must_start_on_first_day_of_month(self):
+        term = Term(
+            title="Invalid Term",
+            start_date="2026-09-15",
+            end_date="2026-09-30",
+            term_type="normal",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean()
+
+    def test_term_must_end_on_last_day_of_month(self):
+        term = Term(
+            title="Invalid Term",
+            start_date="2026-09-01",
+            end_date="2026-09-15",
+            term_type="normal",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean() 
+
+    def test_term_must_be_one_month(self):
+        term = Term(
+            title="Invalid Term",
+            start_date="2026-09-01",
+            end_date="2026-10-31",
+            term_type="normal",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean() 
+    def test_valid_one_month_term_is_accepted(self):
+        term = Term(
+            title="September 2026",
+            start_date="2026-09-01",
+            end_date="2026-09-30",
+            term_type="normal",
+        )
+
+        term.full_clean() 
+
+    def test_february_term_must_end_on_28th(self):
+        term = Term(
+            title="February 2026",
+            start_date="2026-02-01",
+            end_date="2026-02-28",
+            term_type="normal",
+        )
+
+        term.full_clean() 
+
+    def test_thirty_one_day_month_must_end_on_31st(self):
+        term = Term(
+            title="January 2026",
+            start_date="2026-01-01",
+            end_date="2026-01-31",
+            term_type="normal",
+        )
+
+        term.full_clean()
+
+    def test_thirty_day_month_must_end_on_30th(self):
+        term = Term(
+            title="April 2026",
+            start_date="2026-04-01",
+            end_date="2026-04-30",
+            term_type="normal",
+        )
+
+        term.full_clean() 
+
+    def test_leap_year_february_must_end_on_29th(self):
+        term = Term(
+            title="February 2028",
+            start_date="2028-02-01",
+            end_date="2028-02-29",
+            term_type="normal",
+        )
+
+        term.full_clean()
+
+    def test_term_cannot_end_in_another_month(self):
+        term = Term(
+            title="January 2026",
+            start_date="2026-01-01",
+            end_date="2026-02-01",
+            term_type="normal",
+        )
+
+        with self.assertRaises(ValidationError):
+            term.full_clean() 
+
+    
 class TermAPITest(APITestCase):
 
     def setUp(self):
@@ -92,7 +186,7 @@ class TermAPITest(APITestCase):
         self.term_data = {
             "title": "Fall 2026",
             "start_date": "2026-09-01",
-            "end_date": "2027-01-20",
+            "end_date": "2026-09-30",
             "term_type": "normal",
         }
 
@@ -140,7 +234,7 @@ class TermAPITest(APITestCase):
         Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
@@ -156,7 +250,7 @@ class TermAPITest(APITestCase):
         term = Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
@@ -195,7 +289,7 @@ class TermAPITest(APITestCase):
         data = {
             "title": "Invalid Type Term",
             "start_date": "2026-09-01",
-            "end_date": "2027-01-20",
+            "end_date": "2026-09-30",
             "term_type": "winter",
         }
 
@@ -219,7 +313,7 @@ class TermAPITest(APITestCase):
         term = Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
         response = self.client.patch(
@@ -240,7 +334,7 @@ class TermAPITest(APITestCase):
         term = Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
         response = self.client.patch(
@@ -255,7 +349,10 @@ class TermAPITest(APITestCase):
             status.HTTP_400_BAD_REQUEST,
         )
         term.refresh_from_db()
-        self.assertEqual(term.end_date.isoformat(), "2027-01-20")
+        self.assertEqual(
+            term.end_date.isoformat(),
+            "2026-09-30",
+        )
 
 
     def test_education_can_soft_delete_term(self):
@@ -264,7 +361,7 @@ class TermAPITest(APITestCase):
         term = Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
@@ -283,8 +380,8 @@ class TermAPITest(APITestCase):
 
         term = Term.objects.create(
             title="Deleted Term",
-            start_date="2026-09-01",
-            end_date="2027-01-20",
+           start_date="2026-09-01",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
@@ -293,9 +390,77 @@ class TermAPITest(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0) 
+        self.assertEqual(len(response.data), 0)
 
+    def test_update_term_with_invalid_start_date(self):
+        self.client.force_authenticate(user=self.education)
 
+        term = Term.objects.create(
+            title="September 2026",
+            start_date="2026-09-01",
+            end_date="2026-09-30",
+            term_type="normal",
+        )
+
+        response = self.client.patch(
+            f"{self.url}{term.id}/",
+            {
+                "start_date": "2026-09-15",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_update_term_with_invalid_end_date(self):
+        self.client.force_authenticate(user=self.education)
+
+        term = Term.objects.create(
+            title="September 2026",
+            start_date="2026-09-01",
+            end_date="2026-09-30",
+            term_type="normal",
+        )
+
+        response = self.client.patch(
+            f"{self.url}{term.id}/",
+            {
+                "end_date": "2026-09-15",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        ) 
+
+    def test_update_term_with_valid_month_dates(self):
+        self.client.force_authenticate(user=self.education)
+
+        term = Term.objects.create(
+            title="September 2026",
+            start_date="2026-09-01",
+            end_date="2026-09-30",
+            term_type="normal",
+        )
+
+        response = self.client.patch(
+            f"{self.url}{term.id}/",
+            {
+                "start_date": "2026-10-01",
+                "end_date": "2026-10-31",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )           
 
 ########## CLASS ######### 
 
@@ -700,14 +865,14 @@ class ClassFilterAPITest(APITestCase):
         self.term = Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 
         self.other_term = Term.objects.create(
             title="Summer 2026",
             start_date="2026-06-01",
-            end_date="2026-08-31",
+            end_date="2026-06-30",
             term_type="summer",
         )
 
@@ -946,7 +1111,7 @@ class TeacherAssignmentTest(APITestCase):
         self.term = Term.objects.create(
             title="Fall 2026",
             start_date="2026-09-01",
-            end_date="2027-01-20",
+            end_date="2026-09-30",
             term_type="normal",
         )
 

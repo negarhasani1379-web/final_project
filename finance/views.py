@@ -4,12 +4,30 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from account.permissions import IsEducation, IsTeacher
-from finance.models import SessionReport
+from account.models import User
+from account.permissions import IsEducation, IsFinance, IsTeacher
+from finance.models import SessionReport, TeacherTermRate
 from finance.serializers import (
+    SalarySerializer,
     SessionReportReviewSerializer,
     SessionReportSerializer,
+    TeacherMonthlySalaryBulkCalculateSerializer,
+    TeacherMonthlySalaryCalculateSerializer,
+    TeacherMonthlySalaryListSerializer,
+    TeacherTermRateSerializer,
 )
+from finance.services import (
+    calculate_all_teachers_monthly_salary,
+    calculate_teacher_monthly_salary,
+    list_teacher_monthly_salaries,
+    list_teacher_own_salaries,
+)
+
+
+class TeacherTermRateListCreateView(generics.ListCreateAPIView):
+    queryset = TeacherTermRate.objects.all()
+    serializer_class = TeacherTermRateSerializer
+    permission_classes = [IsAuthenticated, IsFinance]
 
 
 class SessionReportCreateView(generics.CreateAPIView):
@@ -129,5 +147,93 @@ class TeacherMonthlyReportSummaryView(APIView):
                 "year": int(year),
                 **summary,
             }
+        )   
+
+
+class TeacherMonthlySalaryCalculateView(generics.CreateAPIView):
+
+    serializer_class = TeacherMonthlySalaryCalculateSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+        IsFinance,
+    ]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            salary = calculate_teacher_monthly_salary(
+                teacher=serializer.validated_data["teacher"],
+                year=serializer.validated_data["year"],
+                month=serializer.validated_data["month"],
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=400,
+            )
+
+        return Response(
+            SalarySerializer(salary).data,
+            status=200,
+        )
+    
+
+class TeacherMonthlySalaryBulkCalculateView(generics.CreateAPIView):
+    serializer_class = TeacherMonthlySalaryBulkCalculateSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsFinance,
+    ]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            salaries = calculate_all_teachers_monthly_salary(
+                year=serializer.validated_data["year"],
+                month=serializer.validated_data["month"],
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=400,
+            )
+
+        return Response(
+            SalarySerializer(salaries, many=True).data,
+            status=200,
         )
 
+class SalaryListView(generics.ListAPIView):
+    serializer_class = SalarySerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsFinance,
+    ]
+
+    def get_queryset(self):
+        serializer = TeacherMonthlySalaryListSerializer(
+            data=self.request.query_params
+        )
+        serializer.is_valid(raise_exception=True)
+
+        return list_teacher_monthly_salaries(
+            year=serializer.validated_data["year"],
+            month=serializer.validated_data["month"],
+        ) 
+
+class TeacherOwnSalaryHistoryView(generics.ListAPIView):
+    serializer_class = SalarySerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsTeacher,
+    ]
+
+    def get_queryset(self):
+        return list_teacher_own_salaries(
+            self.request.user
+        )           

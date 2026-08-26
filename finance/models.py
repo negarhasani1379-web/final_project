@@ -96,7 +96,8 @@ class Salary(BaseModel):
     )
 
     month = models.PositiveSmallIntegerField()
-
+    year = models.PositiveSmallIntegerField()
+    
     calculated_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -110,3 +111,11 @@ class Salary(BaseModel):
     adjustment_reason = models.TextField(
         blank=True,
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teacher", "year", "month"],
+                name="unique_teacher_salary_per_month",
+            )
+        ]

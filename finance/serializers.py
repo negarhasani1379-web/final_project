@@ -1,7 +1,8 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from finance.models import SessionReport
+from account.models import User, UserRole
+from finance.models import Salary, SessionReport, TeacherTermRate
 
 
 class SessionReportSerializer(serializers.ModelSerializer):
@@ -77,7 +78,7 @@ class SessionReportSerializer(serializers.ModelSerializer):
             if instance.rejected_at:
                 validated_data["is_late"] = (
                     resubmitted_at - instance.rejected_at
-                ).total_seconds() > 18 * 60 * 60
+                ).total_seconds() > 48 * 60 * 60
 
         return super().update(instance, validated_data)
     
@@ -135,4 +136,72 @@ class SessionReportReviewSerializer(serializers.ModelSerializer):
             "is_late",
             "rejected_at",
             "resubmitted_at",
-        ]    
+        ] 
+
+class TeacherTermRateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = TeacherTermRate
+        fields = [
+            "id",
+            "teacher",
+            "term",
+            "base_rate",
+        ]
+        read_only_fields = [
+            "id",
+        ]
+
+class SalarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Salary
+        fields = [
+            "id",
+            "teacher",
+            "term",
+            "year",
+            "month",
+            "calculated_amount",
+            "final_amount",
+            "adjustment_reason",
+        ]
+        read_only_fields = [
+            "id",
+            "teacher",
+            "term",
+            "year",
+            "month",
+            "calculated_amount",
+            "final_amount",
+            "adjustment_reason",
+        ]
+
+class TeacherMonthlySalaryCalculateSerializer(serializers.Serializer):
+
+    teacher = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(
+            role=UserRole.TEACHER
+        )
+    )
+
+    year = serializers.IntegerField()
+
+    month = serializers.IntegerField(
+        min_value=1,
+        max_value=12,
+    )
+
+class TeacherMonthlySalaryBulkCalculateSerializer(serializers.Serializer):
+    year = serializers.IntegerField()
+    month = serializers.IntegerField(
+        min_value=1,
+        max_value=12,
+    ) 
+
+class TeacherMonthlySalaryListSerializer(serializers.Serializer):
+    year = serializers.IntegerField()
+    month = serializers.IntegerField(
+        min_value=1,
+        max_value=12,
+    )       
